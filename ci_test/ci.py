@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 import xml.etree.cElementTree as Et
 from xml.dom import minidom
-from toml import load
+from toml import load, dump as dump_ci
 
 dynamic_lib = ".dll" if platform.system() == "Windows" else ".so"
 static_lib = ".lib" if platform.system() == "Windows" else ".a"
@@ -44,6 +44,7 @@ def parse_args(cfgs):
     build_parser.add_argument("-f", "--full", action='store_true', help="是否是全量进行构建, 默认cjpm build -i")
     build_parser.add_argument("--coverage", action='store_true', help="是否使用覆盖率方式构建")
     build_parser.add_argument("--cj-home", help="设置仓颉环境路径")
+    build_parser.add_argument("--stdx-home", help="设置仓颉环境路径")
     build_parser.set_defaults(func=build)
 
     test_parser = sub_parser.add_parser("test", help="用于LLT测试命令")
@@ -141,6 +142,10 @@ def parse_args(cfgs):
         cfgs.LOG.info("用户中断程序异常退出.")
         exit(1)
 
+def set_parse_args(parser_obj):
+
+    pass
+
 
 def perf_test(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
@@ -234,14 +239,16 @@ def cjtest(args):
             set_cjtest_path(args, cfgs, '3rd_party_root')
     if args.target:
         if get_cjtest_path(args, cfgs, args.target) == "":
-            cfgs.LOG.info("请配置ohos的3rd_party_root")
-            exit(1)
+            cfgs.LOG.warn("请配置ohos的3rd_party_root")
         else:
             _get_DEVECO_CANGJIE_HOME(cfgs)
     else:
         if get_cjtest_path(args, cfgs, "") == "":
-            cfgs.LOG.info("请配置3rd_party_root, ciTest cjtest --root=CangjieObjectParentPath.")
-            exit(1)
+            cfgs.LOG.warn("请配置3rd_party_root, ciTest cjtest --root=CangjieObjectParentPath.")
+    if cfgs.CANGJIE_STDX_PATH:
+        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
+        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
     HLTtest(args, cfgs)
 
 
@@ -272,7 +279,7 @@ def clean(cfgs):
 
 def coverage(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
-    args.e = conf_coverage(cfgs)
+    args.e = None
     args.coverage = True
     args.target = args.ohos_home = args.cj_home = args.case = args.ut = args.path = args.O2 = args.O1 = args.O0 = args.full = None
     if not args.html:
@@ -310,24 +317,11 @@ def build(args):
     if args.full:
         cfgs.LOG.info(f"清理build构建目录: {os.path.join(cfgs.HOME_DIR, cfgs.BUILD_BIN)}")
         shutil.rmtree(os.path.join(cfgs.HOME_DIR, cfgs.BUILD_BIN), ignore_errors=True)
-    library_copy_files(cfgs)
-    build_system = get_build_system(cfgs)
-    if (not args.target) and (build_system) and "aarch64-linux-ohos" == build_system:
-        exit(0)
-    build_file = conf_other_build_file(cfgs)
-    if build_file:
-        build_other_file(build_file, args, cfgs)
-    elif cfgs.CUSTOM_MAP.get('other_build_script'):
-        build_other_file(cfgs.CUSTOM_MAP.get('other_build_script'), args, cfgs)
-    else:
-        runBuild(args, cfgs)
+    runBuild(args, cfgs)
 
 
 def test(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
-    build_system = get_build_system(cfgs)
-    if (not args.target) and (build_system) and ("aarch64-linux-ohos" == build_system or "ohos" == build_system):
-        exit(0)
     if args.path and args.case:
         cfgs.LOG.error("单跑用例和单跑指定文件夹, 不能同时设置. ")
         exit(1)
@@ -339,14 +333,6 @@ def test(args):
             cfgs.LOG.error("指定文件夹不存在. 请重试")
             exit(1)
     clean(cfgs)
-    # if args.O2:
-    #     args.optimize = ' -O2'
-    # elif args.O1:
-    #     args.optimize = ' -O1'
-    # elif not (args.O0 and args.O1 and args.O2):
-    #     args.optimize = ' -O0'
-    # else:
-    #     args.optimize = ' -O0'
     if args.coverage:
         args.optimize = ' -O0 --coverage'
     elif args.O is None:
@@ -391,7 +377,7 @@ def __find_cjpm_home_librarys(args, cfgs):
             sss += __improt_libs([sub_lib], cfgs)
             if cfgs.OS_PLATFORM == "windows":
                 __get_windows_c_lib_arr(cfgs, sub_lib)
-        cfgs.IMPORT_PATH = sss
+        cfgs.IMPORT_PATH += sss
     except:
         pass
 
@@ -426,12 +412,6 @@ def __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, that_lib_path):
 def config_cjc(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     master_cjc = shutil.which("cjc")
-    priority = conf_self_build_file(cfgs, 'cangjie_library', 'lib_sort')
-    if priority:
-        lib_arr = priority.split(',')
-        for item in lib_arr:
-            if not cfgs.LIBRARY_PRIORITY.__contains__(item):
-                cfgs.LIBRARY_PRIORITY.append(item)
     #使用命令行指定的cjc进行构建测试
     cfgs.BUILD_CJPM_PATH = get_cangjie_path(cfgs, 'cjpm')
     if cfgs.BUILD_CJPM_PATH == '':
@@ -449,22 +429,42 @@ def config_cjc(args):
             cfgs.LOG.error("No Cangjie path set.")
         else:
             args.cj_home = cfgs.cj_home
+
         envsetup(args, cfgs)
         cfgs.LOG.info("There is no CJC compiler, configuring the default CJC compiler.")
     else:
-        out = os.popen('{} -v'.format(shutil.which("cjc")))
-        base_cjc_version = out.readline().split('Cangjie Compiler: ')[1].split(' (')[0]
-        h_cjc_version = base_cjc_version.split(".")
-        if int(h_cjc_version[0]) == 0:
-            if int(h_cjc_version[1]) < 49:
-                cfgs.set_build_bin("build")
-                cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
-            else:
-                cfgs.set_build_bin("target")
-                cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
-        else:
-            pass  ## TODO
         cfgs.LOG.info("The CJC compiler has been configured.")
+    out = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
+    cfgs.LOG.info(out)
+    cfgs.BASE_CJC_VERSION = out.split('Cangjie Compiler: ')[1].split(' (')[0]
+    h_cjc_version = cfgs.BASE_CJC_VERSION.split(".")
+    cfgs.CANGJIE_TARGET = out.split('Target: ')[1].replace('\n', '').replace('\r', '')
+    if int(h_cjc_version[0]) == 0:
+        if int(h_cjc_version[1]) < 49:
+            cfgs.set_build_bin("build")
+            cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
+        else:
+            cfgs.set_build_bin("target")
+            cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
+    else:
+        pass  ## TODO
+    # config stdx for 0.60.*
+    if not cfgs.CANGJIE_STDX_PATH:
+        if int(h_cjc_version[0]) == 0 and int(h_cjc_version[1]) >= 60:
+            cfgs.LOG.info("仓颉版本大于0.60.*, 需要检查stdx是否配置")
+            if master_cjc:
+                cfgs.LOG.info("当前环境变量已经设置仓颉, 检查CANGJIE_HOME中是否存在stdx")
+                cfgs.CANGJIE_STDX_PATH = os.path.join(Path(master_cjc).parent.parent, "stdx", "dynamic", "stdx")
+            else:
+                cfgs.LOG.info("未配置仓颉环境, 正在配置指定的路径的stdx")
+                if not os.path.exists(os.path.join(cfgs.cj_home, "stdx", cfgs.BASE_CJC_VERSION)):
+                    cfgs.LOG.error(f"{os.path.join(cfgs.cj_home, 'stdx', cfgs.BASE_CJC_VERSION)} not found")
+                else:
+                    cfgs.CANGJIE_STDX_PATH = os.path.join(cfgs.cj_home, "stdx", cfgs.BASE_CJC_VERSION, "dynamic", "stdx")## 默认配置到cangjie_env下面stdx
+            __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_PATH)
+        else:
+            cfgs.LOG.info("仓颉版本小于0.60.*")
+
     # read cjc version
     cfg = os.path.join(cfgs.HOME_DIR, cfgs.CONFIG_FILE)
     try:
@@ -507,6 +507,7 @@ def parser_maple_test_config_file(cfgs):
     cfgs.temp_dir = complete_path(os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "running", "temp_dir", default="../test_temp/run")))
     cfgs.log_dir = complete_path(os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "logging", "name", default="../test_temp/log")))
     cfgs.level = get_config_value(cfg, "logging", "level", default="INFO")
+    cfgs.BUILD_CI_TEST_CFG = cfg
 
 
 
@@ -565,36 +566,6 @@ def __load_c_library(args, cfgs):
 
 
 
-def build_other_file(build_file, args, cfgs):
-    cfgs.LOG.info("Custom build method starting....")
-    if platform.system() == "Linux":
-        if str(build_file).endswith('.sh'):
-            build_file_path = os.path.join(cfgs.HOME_DIR, build_file)
-        else:
-            build_file_path = os.path.join(cfgs.HOME_DIR, build_file + '.sh')
-    else:
-        if str(build_file).endswith('.bat'):
-            build_file_path = os.path.join(cfgs.HOME_DIR, build_file)
-        else:
-            build_file_path = os.path.join(cfgs.HOME_DIR, build_file + '.bat')
-    if os.path.exists(build_file_path):
-        bash = shutil.which("bash")
-        if platform.system() == "Linux":
-            cmd = "{} {}".format(bash, build_file_path)
-        else:
-            cmd = str(build_file_path)
-        output = subprocess.Popen(cmd, shell=True, cwd=cfgs.HOME_DIR, stderr=PIPE, stdout=PIPE)
-        log_output(output, output.args,cfgs, cfgs.HOME_DIR)
-        if output.returncode == 0:
-            cfgs.LOG.info("other build success!!")
-        else:
-            cfgs.LOG.error("other build error, return code {}".format(output.returncode))
-            exit(1)
-    else:
-        cfgs.LOG.error("No Other Build File Found: {}".format(build_file_path))
-        exit(1)
-
-
 # 删除后缀名文件
 def delete_suffix_file(filepath, suffix_name):
     for file in os.listdir(filepath):
@@ -621,8 +592,8 @@ def get_sublib_list(cfgs, path):
             for file in files:
                 if dynamic_lib in str(file) or static_lib in str(file):
                     lib_list.append(str(os.path.join(path_2, file)))
-    for sub_lib in get_sublibrary_path(cfgs, path):
-        get_sublib_list(cfgs, os.path.join(path, sub_lib))
+    # for sub_lib in get_sublibrary_path(cfgs, path):
+    #     get_sublib_list(cfgs, os.path.join(path, sub_lib))
 
 
 def get_cjc_cpm(cfgs):
@@ -638,6 +609,50 @@ def get_cjc_cpm(cfgs):
 
 
 def cjpmbuild(args, cfgs):
+    output = __do_cjpm_build(args, cfgs)
+    out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
+    set_build_log_warnings_count(cfgs, err)
+    if "imports package 'stdx" in str(err):
+        cfgs.LOG.info("Trying again using STDX package.")
+        if cfgs.CANGJIE_STDX_PATH:
+            stdx_lib = cfgs.CANGJIE_STDX_PATH
+            if not os.path.exists(os.path.join(cfgs.CANGJIE_STDX_PATH, cfgs.BASE_CJC_VERSION)):
+                cfgs.LOG.error(str(out))
+                cfgs.LOG.error("cjpm build error..")
+                exit(output.returncode)
+            else:
+                stdx_lib = os.path.join(cfgs.CANGJIE_STDX_PATH, cfgs.BASE_CJC_VERSION, "dynamic", "stdx")
+
+            ci_test_cfg = cfgs.BUILD_PARMS
+            ci_test_cfg_target = ci_test_cfg['target']
+            if cfgs.CANGJIE_TARGET not in ci_test_cfg_target:
+                ci_test_cfg_target[cfgs.CANGJIE_TARGET] = {"bin-dependencies": {"path-option": [stdx_lib]}}
+                dump_ci(ci_test_cfg, open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w"))
+            else:
+                if "bin-dependencies" not in ci_test_cfg_target[cfgs.CANGJIE_TARGET]:
+                    ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies'] = {"path-option": [stdx_lib]}
+                else:
+                    if "path-option" not in ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']:
+                        ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"] = [stdx_lib]
+                    else:
+                        ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"].append(stdx_lib)
+            output = __do_cjpm_build(args, cfgs)
+            out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
+            set_build_log_warnings_count(cfgs, err)
+            if output.returncode != 0 or (err and "build failed" in str(err)):
+                cfgs.LOG.error(str(out))
+                cfgs.LOG.error("cjpm build error..")
+                exit(output.returncode)
+        else:
+            cfgs.LOG.error("No configuration of STDX package was found.")
+    elif output.returncode != 0 or (err and "build failed" in str(err)):
+        cfgs.LOG.error(str(out))
+        cfgs.LOG.error("cjpm build error..")
+        exit(output.returncode)
+
+
+
+def __do_cjpm_build(args, cfgs):
     if args.full:
         cmd0 = "{} update".format(get_cjc_cpm(cfgs))
         output = subprocess.Popen(cmd0, shell=True, cwd=cfgs.HOME_DIR, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -665,14 +680,9 @@ def cjpmbuild(args, cfgs):
         # 读取 DEVECO_CANGJIE_HOME 环境变量
         _get_DEVECO_CANGJIE_HOME(cfgs)
         cmd1 += " --target=aarch64-linux-ohos"
-    output = subprocess.Popen(cmd1, shell=True, cwd=cfgs.HOME_DIR, stderr=subprocess.PIPE,
+    return subprocess.Popen(cmd1, shell=True, cwd=cfgs.HOME_DIR, stderr=subprocess.PIPE,
                               stdout=subprocess.PIPE)
-    out, err = log_output(output, output.args,cfgs, cfgs.HOME_DIR)
-    if output.returncode != 0 or (err and "build failed" in str(err)):
-        cfgs.LOG.error(str(out))
-        cfgs.LOG.error("cjpm build error..")
-        exit(output.returncode)
-    set_build_log_warnings_count(cfgs, err)
+    # return log_output(output, output.args,cfgs, cfgs.HOME_DIR)
 
 
 def __loop_down_load_cjpm_librarys(cfgs, sub_librarys):
@@ -835,6 +845,17 @@ def set_cangjie_home(cfgs, cjc_home):
             'LD_LIBRARY_PATH', "")
 
 
+def __set_cangjie_stdx_home(cfgs, stdx_home):
+    if cfgs.OS_PLATFORM == "windows":
+        cangjie_stdx_path = ""
+        if stdx_home not in os.environ['Path']:
+            cangjie_stdx_path += f'{stdx_home};'
+        os.environ['Path'] = f"{cangjie_stdx_path}{os.environ['Path']}"
+    else:
+        os.environ['LD_LIBRARY_PATH'] = f"{stdx_home}:" + os.environ.get('LD_LIBRARY_PATH', "")
+    cfgs.LOG.info("set cangjie stdx success.")
+
+
 def get_cjc_version(path):
     if not str(path).endswith('README.md'):
         return 0
@@ -918,109 +939,8 @@ def cangjie_env_setup(lib_dir):
                 if str(item) not in os.getenv('LD_LIBRARY_PATH'):
                     os.environ['LD_LIBRARY_PATH'] = f"{item}:{os.environ.get('LD_LIBRARY_PATH', '')}"
 
-                if str(item) not in os.getenv('CANGJIE_HOME'):
-                    os.environ["CANGJIE_HOME"] = f"{item}:{os.environ.get('CANGJIE_HOME', '')}"
-
-
-def library_copy_files(cfgs):
-    cfg = read_config(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if cfg:
-        try:
-            list_entry = cfg["library_copy"]
-            for item in list_entry:
-                pa = os.path.join(cfgs.HOME_DIR, *item.split(os.path.sep))
-                for root, p, files in os.walk(pa):
-                    for f in files:
-                        shutil.copy(os.path.join(pa, f), os.path.join(cfgs.HOME_DIR, list_entry[item], f))
-                        cfgs.LOG.info(
-                            f"copy {os.path.join(pa, f)} -> {os.path.join(cfgs.HOME_DIR, list_entry[item], f)}")
-        except:
-            pass
-
-
-def conf_self_build_file(cfgs, key, value):
-    cfg = read_config(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if cfg:
-        try:
-            return cfg[key][value]
-        except:
-            return None
-    else:
-        return None
-
-
-def conf_other_build_file(cfgs):
-    cfg = read_config(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if cfg:
-        try:
-            list_entry = cfg["other_build"]
-            for item in list_entry:
-                if item == "bat_shell" and list_entry[item]:
-                    return list_entry[item]
-                elif item == "shell" and list_entry[item]:
-                    return list_entry[item]
-                else:
-                    return None
-        except KeyError:
-            return None
-    else:
-        return None
-
-
-def get_build_system(cfgs):
-    """ 获取构建的环境信息 """
-    cfg = read_config(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if cfg:
-        try:
-            list_entry = cfg["other_build"]
-            for item in list_entry:
-                if item == "system_only" and list_entry[item]:
-                    return list_entry[item]
-                else:
-                    return None
-        except KeyError:
-            return None
-    else:
-        return None
-
-
-def conf_UT_test(cfgs):
-    cfg = read_config(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if cfg:
-        return get_config_value(cfg, "unittest", "ut", default="true")
-    else:
-        return "true"
-
-
-def conf_coverage(cfgs):
-    cfg = read_config(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if cfg:
-        return get_config_value(cfg, "coverage", "exclude", default="")
-    else:
-        return None
-
-
-def conf_library_depends_dynamic(cfgs):
-    cfg = read_config(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if cfg:
-        return get_config_value(cfg, "external_library", "dynamic", default=None)
-    else:
-        return None
-
-
-def get_sublibrary_path(cfgs, path=None):
-    if path:
-        path = Path(os.path.join(complete_path(cfgs.HOME_DIR), path, "gitee_gate.cfg"))
-    else:
-        path = Path(os.path.join(complete_path(cfgs.HOME_DIR), "gitee_gate.cfg"))
-    if not path or not path.exists() or not path.is_file():
-        return None
-    config = read_config(path)
-    section = "cangjie_library"
-    try:
-        return config[section]
-    except KeyError:
-        return ""
+                # if str(item) not in os.getenv('CANGJIE_HOME'):
+                #     os.environ["CANGJIE_HOME"] = f"{item}:{os.environ.get('CANGJIE_HOME', '')}"
 
 
 def do_load_library_cfg(cfg_path):
@@ -1028,41 +948,18 @@ def do_load_library_cfg(cfg_path):
     return config['cangjie_library'], config['cangjie_library_branch']
 
 
-def do_library_path(cfgs):
-    """read config value from test config"""
-    path = Path(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if not path or not path.exists() or not path.is_file():
-        return None
-    config = read_config(path)
-    section = "cangjie_library"
-    try:
-        return config[section]
-    except KeyError:
-        return ""
-
-
-def do_library_branch(cfgs):
-    """read config value from test config"""
-    path = Path(complete_path(os.path.join(cfgs.HOME_DIR, "gitee_gate.cfg")))
-    if not path or not path.exists() or not path.is_file():
-        return None
-    config = read_config(path)
-    section = "cangjie_library_branch"
-    try:
-        return config[section]
-    except KeyError:
-        return ""
-
-
 def set_build_log_warnings_count(cfgs, err):
-    len = str(err).count('[33mwarning')
-    cfg = read_config(complete_path(choose_method(cfgs)))
-    if cfg.has_section("build-warning"):
-        cfg.set("build-warning", 'warning', str(len))
-    else:
-        cfg.add_section("build-warning")
-        cfg.set("build-warning", 'warning', str(len))
-    cfg.write(open(choose_method(cfgs), 'w', encoding='UTF-8'))
+    try:
+        len = str(err).count('[33mwarning')
+        cfg = read_config(complete_path(choose_method(cfgs)))
+        if cfg.has_section("build-warning"):
+            cfg.set("build-warning", 'warning', str(len))
+        else:
+            cfg.add_section("build-warning")
+            cfg.set("build-warning", 'warning', str(len))
+        cfg.write(open(choose_method(cfgs), 'w', encoding='UTF-8'))
+    except:
+        pass
 
 
 def set_cjtest_path(args, cfgs, target):
@@ -1309,6 +1206,22 @@ def runAll(args, cfgs):
             subcmd = " --coverage"
     except:
         subcmd = ""
+    cj_build_libs = find_lib_path(cfgs.LIB_DIR, '')
+    find_cangjie_lib_arr = []
+    for build_lib in cj_build_libs:
+        cfgs.IMPORT_PATH += f" --import-path {build_lib}"
+        for build_lib_item in os.listdir(build_lib):
+            if build_lib_item.__contains__(".") or 'bin' in build_lib_item:
+                continue
+            if os.path.exists(os.path.join(build_lib, build_lib_item)):
+                cfgs.LIBRARY_PATH += f" -L {os.path.join(build_lib, build_lib_item)}"
+                find_cangjie_lib_arr.append(os.path.join(build_lib, build_lib_item))
+                cangjie_env_setup(find_cangjie_lib_arr)
+    if cfgs.CANGJIE_STDX_PATH:
+        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
+        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
+    __improt_libs(find_cangjie_lib_arr, cfgs)
     loop_dir(args, cfgs, lambda file: runOne(args, file, subcmd, cfgs))
 
 
@@ -1372,24 +1285,9 @@ def runOne(args, file, subcmd, cfgs):
                 case_one_return_code = 0
                 for item in exec:
                     cmd_temp = item
-                    cj_build_libs = find_lib_path(cfgs.LIB_DIR, '')
-                    import_paths = ""
-                    cmd_L = ""
-                    find_cangjie_lib_arr = []
-                    for build_lib in cj_build_libs:
-                        import_paths += f" --import-path {build_lib}"
-                        for build_lib_item in os.listdir(build_lib):
-                            if build_lib_item.__contains__(".") or 'bin' in build_lib_item:
-                                continue
-                            if os.path.exists(os.path.join(build_lib, build_lib_item)):
-                                cmd_L += f" -L {os.path.join(build_lib, build_lib_item)}"
-                                find_cangjie_lib_arr.append(os.path.join(build_lib, build_lib_item))
-                                cangjie_env_setup(find_cangjie_lib_arr)
-                    if cfgs.IMPORT_PATH != "":
-                        import_paths += cfgs.IMPORT_PATH
-                    cmd = form_line(item, {"import-path": import_paths})
-                    cmd = form_line(cmd, {"L": cmd_L})
-                    cmd = form_line(cmd, {"l": __improt_libs(find_cangjie_lib_arr, cfgs)})
+                    cmd = form_line(item, {"import-path": cfgs.IMPORT_PATH})
+                    cmd = form_line(cmd, {"L": cfgs.LIBRARY_PATH})
+                    cmd = form_line(cmd, {"l": cfgs.LIBRARY})
                     cmd = form_line(cmd, {"project-path": "--import-path {}".format(cfgs.HOME_DIR)})
                     cmd = form_line(cmd, {"project-L": "-L {}".format(cfgs.HOME_DIR)})
                     cmd = form_line(cmd, {"project": "{}".format(cfgs.HOME_DIR)})
@@ -1436,7 +1334,7 @@ def runOne(args, file, subcmd, cfgs):
 
 def __improt_libs(libsdir, cfgs=None, is_recursion=True):
     LLT_Link_libs = set()
-    LIBS_STR = ""
+    str = ""
     for sub_lib in libsdir:
         if is_recursion:
             for path, _, libs in os.walk(sub_lib):
@@ -1463,8 +1361,41 @@ def __improt_libs(libsdir, cfgs=None, is_recursion=True):
                 cfgs.LIBRARY_PRIORITY.append(ss)
         LLT_Link_libs = cfgs.LIBRARY_PRIORITY
     for ss in LLT_Link_libs:
-        LIBS_STR = LIBS_STR + "-l {} ".format(ss)
-    return LIBS_STR
+        cfgs.LIBRARY += "-l {} ".format(ss)
+        str += "-l {} ".format(ss)
+    return str
+
+
+def __improt_stdx_libs(libsdir, cfgs=None, is_recursion=True):
+    LLT_Link_libs = set()
+    for sub_lib in libsdir:
+        if is_recursion:
+            for path, _, libs in os.walk(sub_lib):
+                for lib in libs:
+                    if lib.startswith("lib") and lib.endswith(".so"):
+                        LLT_Link_libs.add(lib[3:len(lib) - 3])
+                    elif lib.startswith("lib") and lib.endswith(".a"):
+                        LLT_Link_libs.add(lib[3:len(lib) - 2])
+                    elif platform.system() == 'Windows' and lib.startswith("lib") and lib.endswith(".dll"):
+                        LLT_Link_libs.add(lib[3:len(lib) - 4])
+        else:
+            for so in glob.glob(os.path.join(sub_lib, "lib*.dll")):
+                so = os.path.basename(so)
+                LLT_Link_libs.add(so[3:len(so) - 4])
+            for so in glob.glob(os.path.join(sub_lib, "lib*.so")):
+                so = os.path.basename(so)
+                LLT_Link_libs.add(so[3:len(so) - 3])
+            for so in glob.glob(os.path.join(sub_lib, "lib*.a")):
+                so = os.path.basename(so)
+                LLT_Link_libs.add(so[3:len(so) - 2])
+    if cfgs and len(cfgs.LIBRARY_PRIORITY) > 0:
+        for ss in LLT_Link_libs:
+            if not cfgs.LIBRARY_PRIORITY.__contains__(ss):
+                cfgs.LIBRARY_PRIORITY.append(ss)
+        LLT_Link_libs = cfgs.LIBRARY_PRIORITY
+    for ss in LLT_Link_libs:
+        if "stdx.fuzz.fuzz" not in ss:
+            cfgs.LIBRARY += "-l {} ".format(ss)
 
 
 def loop_dir(args, cfgs, callBack):
@@ -1515,11 +1446,6 @@ def ut_result(out, err):
         RESULT.get("FAIL").append(str(arr[3]))
         RESULT.get("FAIL").append(str(arr[4]))
         raise Exception()
-
-
-# def src_files(file):
-#     global SRC_FILES
-#     SRC_FILES = SRC_FILES + " " + file
 
 
 def create_file(path):
@@ -1895,9 +1821,9 @@ def run_one_case(args, file_path, run_option, compile_option, target, cfgs):
     case_import_cmd = '" --import-path="'
     case_library_path_L_cmd = " -L "
     compile_cmd = f'cjc {cfgs.Woff} {args.optimize} {target_cmd} {macro_cmd} ' \
-                  f'--import-path="{case_import_cmd.join(cfgs.import_cmd)}" ' \
-                  f'-L {case_library_path_L_cmd.join(cfgs.library_path_L_cmd)} ' \
-                  f'{cfgs.IMPORT_PATH} ' \
+                  f'--import-path="{case_import_cmd.join(cfgs.import_cmd)}" {cfgs.IMPORT_PATH} ' \
+                  f'-L {case_library_path_L_cmd.join(cfgs.library_path_L_cmd)} {cfgs.LIBRARY_PATH} ' \
+                  f'{cfgs.LIBRARY}' \
                   f'{cfgs.library_l_cmd} ' \
                   f'{file_path} {dependence} -o {os.path.realpath(out)} {compile_option}'
     logger.info(f"[Run CMD]{compile_cmd}")
@@ -2186,6 +2112,8 @@ def HLTtest(args, cfgs):
     if cp.get("test", "fuzz_lib") != "":
         fuzz_lib = cp.get("test", "fuzz_lib")
     _3rd_party_root = get_cjtest_path(args, cfgs, "")
+    if _3rd_party_root == "":
+        _3rd_party_root = Path(cfgs.HOME_DIR).parent
     logger = Logger(cfgs)
     if args.main:
         test_dir = 'benchmark'
@@ -2207,10 +2135,10 @@ def HLTtest(args, cfgs):
         _3rd_party_root = get_cjtest_path(args, cfgs, args.target)
     elif args.main:
         os.environ['cjHeapSize'] = cp.get("test", "cjHeapSize")
-        compile_options = ""
+        compile_options += ""
     elif args.fuzz:
         os.environ["CANGJIE_PATH"] = f"{fuzz_lib}:{os.getenv('CANGJIE_PATH')}"
-        compile_options = f'--link-options="--whole-archive {fuzz_lib} -no-whole-archive -lstdc++ -lpthread" --sanitizer-coverage-inline-8bit-counters'
+        compile_options += f'--link-options="--whole-archive {fuzz_lib} -no-whole-archive -lstdc++ -lpthread" --sanitizer-coverage-inline-8bit-counters'
         fuzz_runs = cp.get("test", "fuzz_runs")
         fuzz_rss_limit_mb = cp.get("test", "fuzz_rss_limit_mb")
         if fuzz_runs:

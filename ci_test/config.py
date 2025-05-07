@@ -31,10 +31,13 @@ class ArgConfig:
     EXPECT_CJC_VERSION = None
     REALLY_CJC_VERSION = None
     build_output_dir = None
-    BUILD_PARMS = None
+    BUILD_PARMS = None # 解析的cjpm.toml参数, 以字典的形式
+    BUILD_CI_TEST_CFG = None #
     BUILD_DEPENDENCIES = []
     BUILD_CJPM_PATH = None
-    IMPORT_PATH = ""
+    IMPORT_PATH = "" # --import-path
+    LIBRARY_PATH = "" # -L
+    LIBRARY = "" # -l
     MODULE_FOREIGN_REQUIRES = None
     WINDOWS_C_LIB_ARR = set()
     CUSTOM_MAP = {}
@@ -42,6 +45,10 @@ class ArgConfig:
     OHOS_CANGJIE_PATH = None
     OHOS_COMPILE_OPTION = None
     OHOS_VERSION = None
+    CANGJIE_TARGET = None
+    CANGJIE_STDX_PATH = None
+    cj_home = None
+    BASE_CJC_VERSION = "0.0.0"
 
     def __init__(self):
         master_cjc = shutil.which("cjc")
