@@ -145,10 +145,6 @@ def parse_args(cfgs):
         cfgs.LOG.info("用户中断程序异常退出.")
         exit(1)
 
-def set_parse_args(parser_obj):
-
-    pass
-
 
 def perf_test(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
@@ -619,14 +615,9 @@ def cjpmbuild(args, cfgs):
         cfgs.LOG.info("Trying again using STDX package.")
         if cfgs.CANGJIE_STDX_PATH:
             stdx_lib = cfgs.CANGJIE_STDX_PATH
-            if not os.path.exists(os.path.join(cfgs.CANGJIE_STDX_PATH, cfgs.BASE_CJC_VERSION)):
-                cfgs.LOG.error(str(out))
-                cfgs.LOG.error("cjpm build error..")
-                exit(output.returncode)
-            else:
-                stdx_lib = os.path.join(cfgs.CANGJIE_STDX_PATH, cfgs.BASE_CJC_VERSION, "dynamic", "stdx")
-
             ci_test_cfg = cfgs.BUILD_PARMS
+            if "target" not in ci_test_cfg:
+                ci_test_cfg['target'] = {}
             ci_test_cfg_target = ci_test_cfg['target']
             if cfgs.CANGJIE_TARGET not in ci_test_cfg_target:
                 ci_test_cfg_target[cfgs.CANGJIE_TARGET] = {"bin-dependencies": {"path-option": [stdx_lib]}}
@@ -639,6 +630,7 @@ def cjpmbuild(args, cfgs):
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"] = [stdx_lib]
                     else:
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"].append(stdx_lib)
+                dump_ci(ci_test_cfg, open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w"))
             output = __do_cjpm_build(args, cfgs)
             out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
             set_build_log_warnings_count(cfgs, err)
