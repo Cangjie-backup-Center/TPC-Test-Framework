@@ -192,7 +192,6 @@ def count(args):
                             if line.__contains__("@TestCase"):
                                 testcase += 1
                     count_func = count_func + testcase
-    print(count_func)
 
 
 def cjlint_check(args):
@@ -255,9 +254,9 @@ def cjtest(args):
 def print_version(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if args.cangjie:
-        print(f"#{cfgs.EXPECT_CJC_VERSION}")
+        cfgs.LOG.info(f"#{cfgs.EXPECT_CJC_VERSION}")
     else:
-        cfgs.LOG.info("Cangjie Koolib Ci Test Version: 0.49.2.1")
+        cfgs.LOG.info("Cangjie Koolib Ci Test Version: 0.60.5.1")
 
 
 def cangjie_ut(args):
@@ -299,7 +298,7 @@ def coverage(args):
 def cangjie_doc(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if platform.system() == 'Windows':
-        print("暂时不支持windows版本..")
+        cfgs.LOG.error("暂时不支持windows版本..")
         return
     if cfgs.BUILD_TYPE == "ci_test":
         dir = os.path.join(cfgs.FILE_ROOT, "cangjiedoc")
@@ -412,6 +411,21 @@ def __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, that_lib_path):
 def config_cjc(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     master_cjc = shutil.which("cjc")
+    # read cjc version
+    cfgs.config_init()
+    cfg = os.path.join(cfgs.HOME_DIR, cfgs.CONFIG_FILE)
+    try:
+        if str(cfgs.CONFIG_FILE).endswith('.toml'):
+            parm = load(cfg)
+            if parm.get('package') is not None:
+                for key, value in parm['package'].items():
+                    if key == "cjc-version":
+                        cfgs.EXPECT_CJC_VERSION = value
+        else:
+            parm = json.load(open(cfg, 'r', encoding='UTF-8'))
+            cfgs.EXPECT_CJC_VERSION = parm['cjc_version']
+    except:
+        cfgs.LOG.warn("本项目没有配置文件module.json和cjpm.toml")
     #使用命令行指定的cjc进行构建测试
     cfgs.BUILD_CJPM_PATH = get_cangjie_path(cfgs, 'cjpm')
     if cfgs.BUILD_CJPM_PATH == '':
@@ -429,7 +443,6 @@ def config_cjc(args):
             cfgs.LOG.error("No Cangjie path set.")
         else:
             args.cj_home = cfgs.cj_home
-
         envsetup(args, cfgs)
         cfgs.LOG.info("There is no CJC compiler, configuring the default CJC compiler.")
     else:
@@ -465,20 +478,7 @@ def config_cjc(args):
         else:
             cfgs.LOG.info("仓颉版本小于0.60.*")
 
-    # read cjc version
-    cfg = os.path.join(cfgs.HOME_DIR, cfgs.CONFIG_FILE)
-    try:
-        if str(cfgs.CONFIG_FILE).endswith('.toml'):
-            parm = load(cfg)
-            if parm.get('package') is not None:
-                for key, value in parm['package'].items():
-                    if key == "cjc-version":
-                        cfgs.EXPECT_CJC_VERSION = value
-        else:
-            parm = json.load(open(cfg, 'r', encoding='UTF-8'))
-            cfgs.EXPECT_CJC_VERSION = parm['cjc_version']
-    except:
-        cfgs.LOG.warn("本项目没有配置文件module.json和cjpm.toml")
+
 
 
 def init_log(cfgs, name):
@@ -812,8 +812,11 @@ def envsetup(args, cfgs):
             # TODO
 
         set_cangjie_home(cfgs, cjc_home)
-        cfgs.LOG.info(f"set cjc version: {env_cjc}")
-        cfgs.LOG.info(os.popen('cjc -v').readline())
+        if env_cjc == '':
+            cfgs.LOG.error(f"set cjc version fail. cjpm.toml Expected version is {cjc_version}")
+            exit(1)
+        else:
+            cfgs.LOG.info(f"set cjc version: {env_cjc}")
         return True
     else:
         cfgs.LOG.error("没有发现配置cjc, 请配置cjc环境后再试. 或者请在命令后加 --cj-home=$CANGJIE_HOME. ")
@@ -989,7 +992,6 @@ def _get_DEVECO_CANGJIE_HOME(cfgs):
         if cfg.has_section("cangjie-home"):
             compile_option = cfg.get("cangjie-home", "OHOS_compile_option")
             if compile_option:
-                print(compile_option)
                 cfgs.OHOS_COMPILE_OPTION = compile_option
                 return
             ohos_version = float(cfg.get("cangjie-home", "OHOS_version"))

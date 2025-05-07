@@ -73,17 +73,16 @@ class ArgConfig:
         else:
             self.LINE_SEPARATOR = "\r"
 
+    def config_init(self):
+        if os.path.exists(os.path.join(self.HOME_DIR, "cjpm.toml")):
+            self.__handle_toml()
+        elif os.path.exists(os.path.join(self.HOME_DIR, "module.json")):
+            self.__handle_json()
+        else:
+            self.LOG.warn("没有项目工程配置文件, 请配置module.json或者cjpm.toml配置文件")
+
     def set_build_bin(self, new_build):
         self.BUILD_BIN = new_build
-        if new_build != "build":
-            if os.path.exists(os.path.join(self.HOME_DIR, "cjpm.toml")):
-                self.__handle_toml()
-            elif os.path.exists(os.path.join(self.HOME_DIR, "module.json")):
-                self.__handle_json()
-            else:
-                self.LOG.warn("没有项目工程配置文件, 请配置module.json或者cjpm.toml配置文件")
-        else:
-            self.__handle_json()
 
     def __handle_toml(self):
         self.CONFIG_FILE = "cjpm.toml"
