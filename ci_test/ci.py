@@ -135,6 +135,9 @@ def parse_args(cfgs):
 
     par = parser.parse_args()
     par.CANGJIE_CI_TEST_CFGS = cfgs
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
     config_cjc(par)
     try:
         par.func(par)
@@ -820,6 +823,7 @@ def envsetup(args, cfgs):
         return True
     else:
         cfgs.LOG.error("没有发现配置cjc, 请配置cjc环境后再试. 或者请在命令后加 --cj-home=$CANGJIE_HOME. ")
+        exit(1)
         return False
 
 
