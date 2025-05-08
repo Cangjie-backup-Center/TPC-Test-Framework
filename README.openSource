@@ -1,9 +1,0 @@
-[
-    {
-        "Name": "toml",
-        "License": "MIT License",
-        "License File": "LICENSE",
-        "Version Number": "v0.10.2",
-        "Upstream URL": "https://github.com/uiri/toml.git",
-    }
-]
