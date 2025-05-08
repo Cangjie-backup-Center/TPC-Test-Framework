@@ -5,6 +5,5 @@
         "License File": "LICENSE",
         "Version Number": "v0.10.2",
         "Upstream URL": "https://github.com/uiri/toml.git",
-        "Description": "仓颉语言实现 TOML4CJ v1.0.0 的parser"
     }
 ]

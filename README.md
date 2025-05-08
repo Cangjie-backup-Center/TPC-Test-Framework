@@ -121,8 +121,9 @@ ciTest bench -p ./test/bench --cjc=0.39.7
 ciTest coverage
 ```
 
-### 8 若仓颉版本0.60.*以上时需要注意stdx文件夹配置
-#### 8.1 仓颉环境已经配置情况下, 需要配置stdx文件夹路径.
+### 8 若仓颉版本0.60.*以上时需要注意stdx文件夹配置 
+**注意: 将解压后的文件夹名linux_x86_64_llvm 更改为 stdx** 
+#### 8.1 仓颉环境已经配置情况下, 需要配置stdx文件夹路径. 
 ```commandline
 // 已经设置好的Cangjie环境目录, 注意stdx文件夹的位置
 ├── bin
