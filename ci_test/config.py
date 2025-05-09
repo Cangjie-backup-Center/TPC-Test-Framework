@@ -5,7 +5,7 @@ import re
 import shutil
 import platform
 import subprocess
-from toml import load
+from tomlkit import parse
 
 
 class ArgConfig:
@@ -49,6 +49,7 @@ class ArgConfig:
     CANGJIE_STDX_PATH = None
     cj_home = None
     BASE_CJC_VERSION = "0.0.0"
+    UPDATE_CJPM_TOML = False
 
     def __init__(self):
         master_cjc = shutil.which("cjc")
@@ -87,7 +88,7 @@ class ArgConfig:
     def __handle_toml(self):
         self.CONFIG_FILE = "cjpm.toml"
         cfg_file = os.path.join(self.HOME_DIR, self.CONFIG_FILE)
-        self.BUILD_PARMS = load(cfg_file)
+        self.BUILD_PARMS = parse(open(cfg_file, "r").read())
         try:
             self.MODULE_NAME = self.BUILD_PARMS['package']['name']
         except:

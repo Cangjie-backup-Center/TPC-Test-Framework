@@ -26,6 +26,7 @@ OHOS_ROOT =
 OHOS_version = 
 home = 仓颉环境目录
 cjpm =  cjpm 管理的git目录
+update_toml = false 是否修改cjpm.toml文件
 
 [build-warning]
 warning = 0

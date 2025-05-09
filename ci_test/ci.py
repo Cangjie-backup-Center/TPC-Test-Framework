@@ -16,7 +16,8 @@ import sys
 from pathlib import Path
 import xml.etree.cElementTree as Et
 from xml.dom import minidom
-from toml import load, dump as dump_ci
+# from toml import load, dump as dump_ci
+from tomlkit import parse, dump as dump_c
 
 dynamic_lib = ".dll" if platform.system() == "Windows" else ".so"
 static_lib = ".lib" if platform.system() == "Windows" else ".a"
@@ -354,7 +355,7 @@ def test(args):
 
 def __find_cjpm_home_librarys(args, cfgs):
     try:
-        parms = load(os.path.join(cfgs.HOME_DIR, "cjpm.lock"))
+        parms = parse(open(os.path.join(cfgs.HOME_DIR, "cjpm.lock"), "r").read())
         sss = ''
         for key, value in parms['requires'].items():
             for k,v in value.items():
@@ -389,7 +390,7 @@ def __get_windows_c_lib_arr(cfgs, sub_lib):
 
 def __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, that_lib_path):
     if cfgs.BUILD_BIN != "build" and os.path.exists(os.path.join(that_lib_path,"cjpm.toml")):
-        parm = load(os.path.join(that_lib_path,"cjpm.toml"))
+        parm = parse(open(os.path.join(that_lib_path,"cjpm.toml"), "r").read())
         if parm.get('ffi') is not None:
             for key, value in parm['ffi'].items():
                 if key == "c":
@@ -415,7 +416,7 @@ def config_cjc(args):
     cfg = os.path.join(cfgs.HOME_DIR, cfgs.CONFIG_FILE)
     try:
         if str(cfgs.CONFIG_FILE).endswith('.toml'):
-            parm = load(cfg)
+            parm = parse(open(cfg, "r").read())
             if parm.get('package') is not None:
                 for key, value in parm['package'].items():
                     if key == "cjc-version":
@@ -466,13 +467,31 @@ def config_cjc(args):
             cfgs.LOG.info("仓颉版本大于0.60.*, 需要检查stdx是否配置")
             if master_cjc:
                 cfgs.LOG.info("当前环境变量已经设置仓颉, 检查CANGJIE_HOME中是否存在stdx")
+            else:
+                master_cjc = shutil.which("cjc")
+                cfgs.LOG.info("未配置仓颉环境, 正在配置指定的路径的stdx")
+            if os.path.exists(os.path.join(Path(master_cjc).parent.parent, "stdx")):
                 cfgs.CANGJIE_STDX_PATH = os.path.join(Path(master_cjc).parent.parent, "stdx", "dynamic", "stdx")
             else:
-                cfgs.LOG.info("未配置仓颉环境, 正在配置指定的路径的stdx")
-                if not os.path.exists(os.path.join(cfgs.cj_home, "stdx", cfgs.BASE_CJC_VERSION)):
-                    cfgs.LOG.error(f"{os.path.join(cfgs.cj_home, 'stdx', cfgs.BASE_CJC_VERSION)} not found")
+                if cfgs.CANGJIE_TARGET == "aarch64-linux-ohos":
+                    targ = "linux_ohos_aarch64_llvm"
+                elif cfgs.CANGJIE_TARGET == "x86_64-linux-ohos":
+                    targ = "linux_ohos_x86_64_llvm"
+                elif cfgs.CANGJIE_TARGET == "x86_64-unknown-linux-gnu":
+                    targ = "linux_x86_64_llvm"
+                elif "windows" in cfgs.CANGJIE_TARGET:
+                    targ = "windows_x86_64_llvm"
+                elif "mingw32" in cfgs.CANGJIE_TARGET:
+                    targ = "windows_x86_64_llvm"
+                elif "aarch64" in cfgs.CANGJIE_TARGET:
+                    targ = "linux_aarch64_llvm"
                 else:
-                    cfgs.CANGJIE_STDX_PATH = os.path.join(cfgs.cj_home, "stdx", cfgs.BASE_CJC_VERSION, "dynamic", "stdx")## 默认配置到cangjie_env下面stdx
+                    targ = "stdx"
+
+                if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
+                    cfgs.LOG.info("stdx路径不存在: "+ os.path.join(Path(master_cjc).parent.parent, targ))
+                    exit(1)
+                cfgs.CANGJIE_STDX_PATH = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
             __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_PATH)
         else:
             cfgs.LOG.info("仓颉版本小于0.60.*")
@@ -506,6 +525,7 @@ def parser_maple_test_config_file(cfgs):
     cfgs.temp_dir = complete_path(os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "running", "temp_dir", default="../test_temp/run")))
     cfgs.log_dir = complete_path(os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "logging", "name", default="../test_temp/log")))
     cfgs.level = get_config_value(cfg, "logging", "level", default="INFO")
+    cfgs.UPDATE_CJPM_TOML = get_config_value(cfg, "cangjie-home", "update_toml", default="false") == "true"
     cfgs.BUILD_CI_TEST_CFG = cfg
 
 
@@ -621,7 +641,6 @@ def cjpmbuild(args, cfgs):
             ci_test_cfg_target = ci_test_cfg['target']
             if cfgs.CANGJIE_TARGET not in ci_test_cfg_target:
                 ci_test_cfg_target[cfgs.CANGJIE_TARGET] = {"bin-dependencies": {"path-option": [stdx_lib]}}
-                dump_ci(ci_test_cfg, open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w"))
             else:
                 if "bin-dependencies" not in ci_test_cfg_target[cfgs.CANGJIE_TARGET]:
                     ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies'] = {"path-option": [stdx_lib]}
@@ -630,7 +649,9 @@ def cjpmbuild(args, cfgs):
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"] = [stdx_lib]
                     else:
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"].append(stdx_lib)
-                dump_ci(ci_test_cfg, open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w"))
+            if cfgs.UPDATE_CJPM_TOML:
+                with open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w") as toml_f:
+                    dump_c(ci_test_cfg, toml_f)
             output = __do_cjpm_build(args, cfgs)
             out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
             set_build_log_warnings_count(cfgs, err)
@@ -721,7 +742,7 @@ def __cjpm_git_download_json(cfgs, sub_library, sub_library_config_file):
 
 def __cjpm_git_download_toml(cfgs, sub_library, sub_library_config_file):
     cfgs.LOG.info(f"check file {sub_library_config_file}")
-    parm = load(sub_library_config_file)
+    parm = parse(open(sub_library_config_file, "r").read())
     name = parm['package']['name']
     gitee = "https://gitcode.com/Cangjie-TPC/ci_lib.git"
     for key, value in parm['ffi'].items():
