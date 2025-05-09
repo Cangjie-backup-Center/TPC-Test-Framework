@@ -88,7 +88,7 @@ class ArgConfig:
     def __handle_toml(self):
         self.CONFIG_FILE = "cjpm.toml"
         cfg_file = os.path.join(self.HOME_DIR, self.CONFIG_FILE)
-        self.BUILD_PARMS = parse(open(cfg_file, "r").read())
+        self.BUILD_PARMS = parse(open(cfg_file, "r", encoding='UTF-8').read())
         try:
             self.MODULE_NAME = self.BUILD_PARMS['package']['name']
         except:
@@ -101,7 +101,7 @@ class ArgConfig:
         except:
             pass
         try:
-            file = open(cfg_file, "r")
+            file = open(cfg_file, "r", encoding='UTF-8')
             for line in file.readlines():
                 if line.startswith("#"):
                     self.CUSTOM_MAP[re.search(r"\[.*?\]",line).group()[1:-1]] = re.search(r"\{.*?\}",line).group()[1:-1]

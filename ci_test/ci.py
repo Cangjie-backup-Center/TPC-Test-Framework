@@ -355,7 +355,7 @@ def test(args):
 
 def __find_cjpm_home_librarys(args, cfgs):
     try:
-        parms = parse(open(os.path.join(cfgs.HOME_DIR, "cjpm.lock"), "r").read())
+        parms = parse(open(os.path.join(cfgs.HOME_DIR, "cjpm.lock"), "r", encoding='UTF-8').read())
         sss = ''
         for key, value in parms['requires'].items():
             for k,v in value.items():
@@ -390,7 +390,7 @@ def __get_windows_c_lib_arr(cfgs, sub_lib):
 
 def __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, that_lib_path):
     if cfgs.BUILD_BIN != "build" and os.path.exists(os.path.join(that_lib_path,"cjpm.toml")):
-        parm = parse(open(os.path.join(that_lib_path,"cjpm.toml"), "r").read())
+        parm = parse(open(os.path.join(that_lib_path,"cjpm.toml"), "r", encoding='UTF-8').read())
         if parm.get('ffi') is not None:
             for key, value in parm['ffi'].items():
                 if key == "c":
@@ -416,7 +416,7 @@ def config_cjc(args):
     cfg = os.path.join(cfgs.HOME_DIR, cfgs.CONFIG_FILE)
     try:
         if str(cfgs.CONFIG_FILE).endswith('.toml'):
-            parm = parse(open(cfg, "r").read())
+            parm = parse(open(cfg, "r", encoding='UTF-8').read())
             if parm.get('package') is not None:
                 for key, value in parm['package'].items():
                     if key == "cjc-version":
@@ -652,7 +652,7 @@ def cjpmbuild(args, cfgs):
                     else:
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"].append(stdx_lib)
             if cfgs.UPDATE_CJPM_TOML:
-                with open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w") as toml_f:
+                with open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w", encoding='UTF-8') as toml_f:
                     dump_c(ci_test_cfg, toml_f)
             output = __do_cjpm_build(args, cfgs)
             out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
@@ -744,7 +744,7 @@ def __cjpm_git_download_json(cfgs, sub_library, sub_library_config_file):
 
 def __cjpm_git_download_toml(cfgs, sub_library, sub_library_config_file):
     cfgs.LOG.info(f"check file {sub_library_config_file}")
-    parm = parse(open(sub_library_config_file, "r").read())
+    parm = parse(open(sub_library_config_file, "r", encoding='UTF-8').read())
     name = parm['package']['name']
     gitee = "https://gitcode.com/Cangjie-TPC/ci_lib.git"
     for key, value in parm['ffi'].items():
@@ -1151,7 +1151,7 @@ def cjlint_run(args, cfgs, out_type='json'):
                     exit(output.returncode)
                 temp_json = json.load(open(os.path.join(cfgs.HOME_DIR, "report_temp.json"), "r", encoding='UTF-8'))
                 dicts.extend(temp_json)
-            json.dump(dicts, open(os.path.join(cfgs.HOME_DIR, 'report.json'), 'w'))
+            json.dump(dicts, open(os.path.join(cfgs.HOME_DIR, 'report.json'), 'w', encoding='UTF-8'))
         else:
             cmd = "cjlint -f ./src -r {} -o ./report".format(out_type)
             output = subprocess.Popen(cmd, shell=True, cwd=cfgs.HOME_DIR, stderr=PIPE, stdout=PIPE)
@@ -1164,7 +1164,7 @@ def cjlint_run(args, cfgs, out_type='json'):
 
 def pareFile(path):
     try:
-        file = open(file=path, mode="r", errors='ignore')
+        file = open(file=path, mode="r", errors='ignore', encoding='UTF-8')
         lines = file.readlines()
         dicts = {
             "EXEC": [],
