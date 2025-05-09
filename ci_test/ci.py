@@ -446,6 +446,8 @@ def config_cjc(args):
         envsetup(args, cfgs)
         cfgs.LOG.info("There is no CJC compiler, configuring the default CJC compiler.")
     else:
+        if not os.getenv('CANGJIE_STDX_PATH'):
+            os.environ['CANGJIE_STDX_PATH'] = os.environ['CANGJIE_HOME']
         cfgs.LOG.info("The CJC compiler has been configured.")
     out = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
     cfgs.LOG.info(out)
