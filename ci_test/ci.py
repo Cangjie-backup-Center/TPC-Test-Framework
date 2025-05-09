@@ -856,10 +856,12 @@ def set_cangjie_home(cfgs, cjc_home):
         os.environ['Path'] = f"{cangjie_path}{os.environ['Path']}"
         if not os.getenv('CANGJIE_HOME'):
             os.environ['CANGJIE_HOME'] = f"{cjc_home}"
+            os.environ['CANGJIE_STDX_PATH'] = f"{cjc_home}"
     else:
         cfgs.LOG.info("The current environment is linux")
         os.environ['PATH'] = f"{cjc_home}/bin:{cjc_home}/tools/bin:{cjc_home}/debugger/bin:" + os.environ['PATH']
         os.environ['CANGJIE_HOME'] = f"{cjc_home}"
+        os.environ['CANGJIE_STDX_PATH'] = f"{cjc_home}"
         os.environ[
             'LD_LIBRARY_PATH'] = f"{cjc_home}/runtime/lib/linux_x86_64_llvm:{cjc_home}/debugger/third_party/lldb/lib:" + os.environ.get(
             'LD_LIBRARY_PATH', "")
