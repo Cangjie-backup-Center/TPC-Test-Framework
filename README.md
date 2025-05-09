@@ -154,9 +154,9 @@ ci_test/ci_test.cfg文件配置 home = /home/lyq/cangjie_env
 
 ```
 
-### 8 开源协议
-MulanPSL2
+### 9 开源协议
+Apache License Version 2.0
 
-### 9 参与贡献
+### 10 参与贡献
 
 欢迎给我们提交PR，欢迎给我们提交Issue，欢迎参与任何形式的贡献。
