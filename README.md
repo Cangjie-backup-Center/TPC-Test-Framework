@@ -122,37 +122,21 @@ ciTest coverage
 ```
 
 ### 8 若仓颉版本0.60.*以上时需要注意stdx文件夹配置 
-**注意: 将解压后的文件夹名linux_x86_64_llvm 更改为 stdx** 
+**注意: 以linux x86_64环境为例, 将cangjie-stdx-linux-x64-0.60.5.1.zip解压仓颉环境目录下linux_x86_64_llvm** 
 #### 8.1 仓颉环境已经配置情况下, 需要配置stdx文件夹路径. 
 ```commandline
-// 已经设置好的Cangjie环境目录, 注意stdx文件夹的位置
+// 已经设置好的Cangjie环境目录, 注意stdx包解压的位置
 ├── bin
 ├── envsetup.sh
 ├── lib
 ├── modules
 ├── README.md
 ├── runtime
-├── stdx    // stdx 文件夹放在这里即可
+├── linux_x86_64_llvm    // linux_x86_64_llvm 文件夹放在这里即可
 ├── third_party
 └── tools
 ```
 
-#### 8.2 仓颉环境未配置情况下, 交给ci_test脚本读取, 各个仓颉版本需要按照版本号文件夹保存, 注意stdx文件夹的位置
-
-ci_test/ci_test.cfg文件配置 home = /home/lyq/cangjie_env
-
-```commandline
-// cangjie_env的文件路径为 /home/xxx/cangjie_env(举例)
-├── cangjie_env
-│   ├── 0.56.4
-│   ├── 0.57.3
-│   ├── 0.58.3
-│   ├── 0.59.6
-│   ├── 0.60.5
-│   └── stdx    // stdx 文件夹放在这里即可
-│       └── 0.60.5   // 这里 是0.60.5版本的stdx目录
-
-```
 
 ### 9 开源协议
 Apache License Version 2.0
