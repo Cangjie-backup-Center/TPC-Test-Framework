@@ -46,6 +46,7 @@ def parse_args(cfgs):
     build_parser.add_argument("--coverage", action='store_true', help="是否使用覆盖率方式构建")
     build_parser.add_argument("--cj-home", help="设置仓颉环境路径")
     build_parser.add_argument("--stdx-home", help="设置仓颉环境路径")
+    build_parser.add_argument("--update-toml", action='store_true', help="更新仓颉toml文件")
     build_parser.set_defaults(func=build)
 
     test_parser = sub_parser.add_parser("test", help="用于LLT测试命令")
@@ -647,7 +648,7 @@ def cjpmbuild(args, cfgs):
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"] = [stdx_lib]
                     else:
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"].append(stdx_lib)
-            if cfgs.UPDATE_CJPM_TOML:
+            if cfgs.UPDATE_CJPM_TOML or args.update_toml:
                 with open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w", encoding='UTF-8') as toml_f:
                     cfgs.LOG.info("正在将stdx环境写入cjpm.toml")
                     dump_c(ci_test_cfg, toml_f)
