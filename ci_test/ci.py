@@ -1207,14 +1207,14 @@ def log_output(output, cmd, cfgs, filename=None):
     out = stdout.decode(encode, "ignore").strip()
     if error:
         for item in re.split("\r?\n", error):
-            item = re.sub("\x1b\[\d+m", "", item)
+            item = re.sub(r"\x1b\[\d+m", "", item)
             if output.returncode == 0:
                 cfgs.LOG.warn(item)
             else:
                 cfgs.LOG.error(item)
     if out:
         for item in re.split("\r?\n", out):
-            cfgs.LOG.info(re.sub("\x1b\[\d+m", "", item))
+            cfgs.LOG.info(re.sub(r"\x1b\[\d+m", "", item))
     return out, error
 
 
@@ -1327,7 +1327,7 @@ def runOne(args, file, subcmd, cfgs):
                     if output.returncode != 0:
                         case_one_return_code = output.returncode
                     elif "Summary: TOTAL:" in str(out):
-                        out = re.sub("\x1b\[\d+m", "", str(out))
+                        out = re.sub(r"\x1b\[\d+m", "", str(out))
                         error = int(
                             str(out).split("Summary: TOTAL:")[1].split("ERROR: ")[1].split(cfgs.LINE_SEPARATOR)[0])
                         try:
@@ -1893,10 +1893,10 @@ def get_cases(cfgs):
         with open(log, "r", encoding="utf-8") as f:
             lines = f.readlines()
             log_str = "".join(lines)
-            log_str = re.sub("\x1b\[\d+m", "", log_str)
+            log_str = re.sub(r"\x1b\[\d+m", "", log_str)
             i = 0
             while i < len(lines):
-                line = re.sub("\x1b\[\d+m", "", lines[i])
+                line = re.sub(r"\x1b\[\d+m", "", lines[i])
                 step = 1
                 tcs_match_obj = re.match(r".* TCS: (.*), time elapsed: (.*) ns, RESULT:", line)
                 if tcs_match_obj:
@@ -1915,7 +1915,7 @@ def get_cases(cfgs):
 
                     if "FAILED" in status or "ERROR" in status:
                         for j in range(i + 1, len(lines)):
-                            next_line = re.sub("\x1b\[\d+m", "", lines[j])
+                            next_line = re.sub(r"\x1b\\[\d+m", "", lines[j])
                             tcs_mo = re.match(r".* TCS: (.*), time elapsed: (.*) ns, RESULT:", next_line)
                             case_mo = re.match(r".* \[(.*)\] CASE: (.*) \((.*) ns\)", next_line)
                             not_summary = "Summary: TOTAL" not in next_line
