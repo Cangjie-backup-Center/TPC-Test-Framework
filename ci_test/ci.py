@@ -244,10 +244,6 @@ def cjtest(args):
     else:
         if get_cjtest_path(args, cfgs, "") == "":
             cfgs.LOG.warn("请配置3rd_party_root, ciTest cjtest --root=CangjieObjectParentPath.")
-    if cfgs.CANGJIE_STDX_PATH:
-        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
-        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
-        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
     HLTtest(args, cfgs)
 
 
@@ -2129,6 +2125,10 @@ def gen_report(args, cfgs):
 def HLTtest(args, cfgs):
     global _3rd_party_root
     global logger
+    if cfgs.CANGJIE_STDX_PATH:
+        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
+        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
     if cfgs.BUILD_TYPE == "ci_test" and os.path.exists(
             os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")):
         fuzz_lib = os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")
