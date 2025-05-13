@@ -649,6 +649,7 @@ def cjpmbuild(args, cfgs):
                         ci_test_cfg_target[cfgs.CANGJIE_TARGET]['bin-dependencies']["path-option"].append(stdx_lib)
             if cfgs.UPDATE_CJPM_TOML:
                 with open(os.path.join(cfgs.HOME_DIR, "cjpm.toml"), "w", encoding='UTF-8') as toml_f:
+                    cfgs.LOG.info("正在将stdx环境写入cjpm.toml")
                     dump_c(ci_test_cfg, toml_f)
             output = __do_cjpm_build(args, cfgs)
             out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
