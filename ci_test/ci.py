@@ -277,6 +277,7 @@ def coverage(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     args.e = None
     args.coverage = True
+    args.clean = False
     args.target = args.ohos_home = args.cj_home = args.case = args.ut = args.path = args.O2 = args.O1 = args.O0 = args.full = None
     if not args.html:
         args.root = args.main = args.p = args.fuzz = args.target = None
