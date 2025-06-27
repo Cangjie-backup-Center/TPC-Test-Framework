@@ -245,6 +245,7 @@ def cjtest(args):
     else:
         if get_cjtest_path(args, cfgs, "") == "":
             cfgs.LOG.warn("请配置3rd_party_root, ciTest cjtest --root=CangjieObjectParentPath.")
+    args.HLT = False
     HLTtest(args, cfgs)
 
 
