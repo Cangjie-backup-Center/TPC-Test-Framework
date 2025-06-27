@@ -1919,7 +1919,7 @@ def get_cases(cfgs):
 
                     if "FAILED" in status or "ERROR" in status:
                         for j in range(i + 1, len(lines)):
-                            next_line = re.sub(r"\x1b\\[\d+m", "", lines[j])
+                            next_line = re.sub(r"\x1b\[\d+m", "", lines[j])
                             tcs_mo = re.match(r".* TCS: (.*), time elapsed: (.*) ns, RESULT:", next_line)
                             case_mo = re.match(r".* \[(.*)\] CASE: (.*) \((.*) ns\)", next_line)
                             not_summary = "Summary: TOTAL" not in next_line
