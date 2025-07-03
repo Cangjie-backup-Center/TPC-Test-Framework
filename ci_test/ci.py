@@ -451,18 +451,20 @@ def config_cjc(args):
     out = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
     cfgs.LOG.info(out)
     cfgs.BASE_CJC_VERSION = out.split('Cangjie Compiler: ')[1].split(' (')[0]
-    h_cjc_version = cfgs.BASE_CJC_VERSION.split(".")
+    h_cjc_version_arr = cfgs.BASE_CJC_VERSION.split(".")
     cfgs.CANGJIE_TARGET = out.split('Target: ')[1].replace('\n', '').replace('\r', '')
-    if int(h_cjc_version[0]) == 0:
-        if int(h_cjc_version[1]) < 49:
-            cfgs.set_build_bin("build")
-            cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
+    h_cjc_version = float(h_cjc_version_arr[0])
+    if float(h_cjc_version_arr[1]) != 0 :
+        h_cjc_version += float(h_cjc_version_arr[1]) / 10
+    if h_cjc_version < 0.49:
+        cfgs.set_build_bin("build")
+        cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
     else:
         cfgs.set_build_bin("target")
         cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
     # config stdx for 0.60.*
     if not cfgs.CANGJIE_STDX_PATH:
-        if int(h_cjc_version[0]) >= 0 and int(h_cjc_version[1]) >= 60:
+        if h_cjc_version >= 0.60:
             cfgs.LOG.info("仓颉版本大于0.60.*, 需要检查stdx是否配置")
             if master_cjc:
                 cfgs.LOG.info("当前环境变量已经设置仓颉, 检查CANGJIE_HOME中是否存在stdx")
