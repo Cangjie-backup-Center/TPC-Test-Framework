@@ -457,14 +457,12 @@ def config_cjc(args):
         if int(h_cjc_version[1]) < 49:
             cfgs.set_build_bin("build")
             cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
-        else:
-            cfgs.set_build_bin("target")
-            cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
     else:
-        pass  ## TODO
+        cfgs.set_build_bin("target")
+        cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
     # config stdx for 0.60.*
     if not cfgs.CANGJIE_STDX_PATH:
-        if int(h_cjc_version[0]) == 0 and int(h_cjc_version[1]) >= 60:
+        if int(h_cjc_version[0]) >= 0 and int(h_cjc_version[1]) >= 60:
             cfgs.LOG.info("仓颉版本大于0.60.*, 需要检查stdx是否配置")
             if master_cjc:
                 cfgs.LOG.info("当前环境变量已经设置仓颉, 检查CANGJIE_HOME中是否存在stdx")
