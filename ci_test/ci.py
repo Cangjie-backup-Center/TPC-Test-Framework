@@ -618,7 +618,7 @@ def get_cjc_cpm(cfgs):
     try:
         version = os.popen('cjc -v').readline().split('Cangjie Compiler: ')[1].split(' (')[0]
         temp = version.split(".")
-        ver = float(temp[0]) + (float(temp[1]))
+        ver = float(temp[0]) + (float(temp[1]) / 10)
         if ver >= 0.38:
             return "cjpm"
         else:
