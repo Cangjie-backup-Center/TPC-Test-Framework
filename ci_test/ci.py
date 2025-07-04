@@ -455,7 +455,7 @@ def config_cjc(args):
     cfgs.CANGJIE_TARGET = out.split('Target: ')[1].replace('\n', '').replace('\r', '')
     h_cjc_version = float(h_cjc_version_arr[0])
     if float(h_cjc_version_arr[1]) != 0 :
-        h_cjc_version += float(h_cjc_version_arr[1]) / 10
+        h_cjc_version += float(f'0.{h_cjc_version_arr[1]}')
     if h_cjc_version < 0.49:
         cfgs.set_build_bin("build")
         cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
@@ -622,7 +622,7 @@ def get_cjc_cpm(cfgs):
         temp = version.split(".")
         ver = float(temp[0])
         if float(temp[1]) != 0:
-            ver += float(temp[1]) / 10.0
+            ver += float(f'0.{temp[1]}')
         if ver >= 0.38:
             return "cjpm"
         else:
