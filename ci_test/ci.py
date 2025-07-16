@@ -343,7 +343,8 @@ def test(args):
     cfgs.Woff = ""
     try:
         version = os.popen('cjc -v').readline().split('Cangjie Compiler: ')[1].split(' (')[0]
-        if float(version[2:-1]) >= 39.7:
+        vs = version.split('.')
+        if float(vs[0]) > 0 or float(vs[1]) >= 39.7:
             cfgs.Woff = " -Woff all"
     except:
         pass
