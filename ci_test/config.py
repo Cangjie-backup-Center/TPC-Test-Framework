@@ -9,6 +9,24 @@ from tomlkit import parse
 
 
 class ArgConfig:
+    CANGJIE_STDX_DOWNLOAD_MAP = {
+        "1.0.0":
+            {
+                "aarch64-linux-ohos": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.0.1/cangjie-stdx-ohos-aarch64-1.0.0.1.zip",
+                "aarch64": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.0.1/cangjie-stdx-linux-aarch64-1.0.0.1.zip",
+                "x86_64-unknown-linux-gnu": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.0.1/cangjie-stdx-linux-x64-1.0.0.1.zip",
+                "x86_64-linux-ohos": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.0.1/cangjie-stdx-ohos-x64-1.0.0.1.zip",
+                "windows": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.0.1/cangjie-stdx-windows-x64-1.0.0.1.zip",
+            },
+        "1.0.1":
+            {
+                "aarch64-linux-ohos": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-ohos-aarch64-1.0.1.1.zip",
+                "aarch64": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-linux-aarch64-1.0.1.1.zip",
+                "x86_64-unknown-linux-gnu":"https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-linux-x64-1.0.1.1.zip",
+                "x86_64-linux-ohos": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-ohos-x64-1.0.1.1.zip",
+                "windows": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-windows-x64-1.0.1.1.zip"
+            },
+    }
     BUILD_TYPE = None
     LOG = None
     Woff = ""
@@ -31,13 +49,13 @@ class ArgConfig:
     EXPECT_CJC_VERSION = None
     REALLY_CJC_VERSION = None
     build_output_dir = None
-    BUILD_PARMS = None # 解析的cjpm.toml参数, 以字典的形式
-    BUILD_CI_TEST_CFG = None #
+    BUILD_PARMS = None  # 解析的cjpm.toml参数, 以字典的形式
+    BUILD_CI_TEST_CFG = None  #
     BUILD_DEPENDENCIES = []
     BUILD_CJPM_PATH = None
-    IMPORT_PATH = "" # --import-path
-    LIBRARY_PATH = "" # -L
-    LIBRARY = "" # -l
+    IMPORT_PATH = ""  # --import-path
+    LIBRARY_PATH = ""  # -L
+    LIBRARY = ""  # -l
     MODULE_FOREIGN_REQUIRES = None
     WINDOWS_C_LIB_ARR = set()
     CUSTOM_MAP = {}
@@ -74,6 +92,21 @@ class ArgConfig:
         else:
             self.LINE_SEPARATOR = "\r"
 
+    def get_stdx_url(self):
+        if self.CANGJIE_TARGET == "aarch64-linux-ohos":
+            return self.CANGJIE_STDX_DOWNLOAD_MAP[self.BASE_CJC_VERSION][self.CANGJIE_TARGET]
+        elif self.CANGJIE_TARGET == "x86_64-linux-ohos":
+            return self.CANGJIE_STDX_DOWNLOAD_MAP[self.BASE_CJC_VERSION][self.CANGJIE_TARGET]
+        elif self.CANGJIE_TARGET == "x86_64-unknown-linux-gnu":
+            return self.CANGJIE_STDX_DOWNLOAD_MAP[self.BASE_CJC_VERSION][self.CANGJIE_TARGET]
+        elif "windows" in self.CANGJIE_TARGET:
+            return self.CANGJIE_STDX_DOWNLOAD_MAP[self.BASE_CJC_VERSION]["windows"]
+        elif "mingw32" in self.CANGJIE_TARGET:
+            return self.CANGJIE_STDX_DOWNLOAD_MAP[self.BASE_CJC_VERSION]["windows"]
+        elif "aarch64" in self.CANGJIE_TARGET:
+            return self.CANGJIE_STDX_DOWNLOAD_MAP[self.BASE_CJC_VERSION]["aarch64"]
+        return None
+
     def config_init(self):
         if os.path.exists(os.path.join(self.HOME_DIR, "cjpm.toml")):
             self.__handle_toml()
@@ -104,7 +137,8 @@ class ArgConfig:
             file = open(cfg_file, "r", encoding='UTF-8')
             for line in file.readlines():
                 if line.startswith("#"):
-                    self.CUSTOM_MAP[re.search(r"\[.*?\]",line).group()[1:-1]] = re.search(r"\{.*?\}",line).group()[1:-1]
+                    self.CUSTOM_MAP[re.search(r"\[.*?\]", line).group()[1:-1]] = re.search(r"\{.*?\}", line).group()[
+                                                                                 1:-1]
             file.close()
         except:
             self.LOG.warn("toml 配置文件定义出错, 格式 # [key]={value}, 请检查")
@@ -136,5 +170,3 @@ class ArgConfig:
             if res.poll():
                 res.kill()
         return res.returncode
-
-

@@ -47,6 +47,7 @@ def parse_args(cfgs):
     build_parser.add_argument("--cj-home", help="设置仓颉环境路径")
     build_parser.add_argument("--stdx-home", help="设置仓颉环境路径")
     build_parser.add_argument("--update-toml", action='store_true', help="更新仓颉toml文件")
+    build_parser.add_argument("--update-stdx", action='store_true', help="更新仓颉stdx")
     build_parser.set_defaults(func=build)
 
     test_parser = sub_parser.add_parser("test", help="用于LLT测试命令")
@@ -57,7 +58,7 @@ def parse_args(cfgs):
     test_parser_path.add_argument("--case", help="指定单跑一个用例")
     test_parser_path.add_argument("--target", help="适用于ohos")
     test_parser_path.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
-    test_parser_path.add_argument("-p","--path", help="指定跑一个文件夹, 适用于在test/LLT文件夹多个文件夹方式")
+    test_parser_path.add_argument("-p", "--path", help="指定跑一个文件夹, 适用于在test/LLT文件夹多个文件夹方式")
     test_parser.set_defaults(func=test)
 
     ut_parser = sub_parser.add_parser("ut", help="单元测试的命令")
@@ -70,17 +71,20 @@ def parse_args(cfgs):
     sub_sub_ut_parser.add_argument("-V", '--verbose', action='store_true', help='配置项开启后，会输出单元测试的日志')
     sub_sub_ut_parser.add_argument("-g", action='store_true', help='用来生成 debug 版本的单元测试产物')
     sub_sub_ut_parser.add_argument("--bench", action='store_true', help='用来指定只执行 @bench 宏修饰用例的测试结果')
-    sub_sub_ut_parser.add_argument("--coverage", action='store_true', help='配合 cjcov 命令可以生成单元测试的覆盖率报告。使用 cjpm test --coverage 统计覆盖率时，源代码中的 main 不会再作为程序入口执行，因此会显示为未被覆盖。建议使用 cjpm test 之后，不再手写多余的 main')
+    sub_sub_ut_parser.add_argument("--coverage", action='store_true',
+                                   help='配合 cjcov 命令可以生成单元测试的覆盖率报告。使用 cjpm test --coverage 统计覆盖率时，源代码中的 main 不会再作为程序入口执行，因此会显示为未被覆盖。建议使用 cjpm test 之后，不再手写多余的 main')
     sub_sub_ut_parser.add_argument("--condition", type=str, help='指定后，可按条件透传 module.json/cjpm.toml 中的命令')
     sub_sub_ut_parser.add_argument("--target", type=str, help='指定后，可交叉编译生成目标平台的单元测试结果，module.json/cjpm.toml 中的配置可参考')
-    sub_sub_ut_parser.add_argument("--filter", type=str, help='<value> 用于过滤测试的子集，value 的形式如下所示：--filter=* 匹配所有测试类  --filter=*.* 匹配所有测试类所有测试用例(结果和*相同)  --filter=*.*Test,*.*case* 匹配所有测试类中以 Test 结尾的用例，或者所有测试类中名字中带有 case 的测试用例'
-                                                      '--filter=MyTest*.*Test,*.*case*,-*.*myTest 匹配所有 MyTest 开头测试类中以 Test 结尾的用例，或者名字中带有 case 的用例，或者名字中不带有 myTest 的测试用例')
+    sub_sub_ut_parser.add_argument("--filter", type=str,
+                                   help='<value> 用于过滤测试的子集，value 的形式如下所示：--filter=* 匹配所有测试类  --filter=*.* 匹配所有测试类所有测试用例(结果和*相同)  --filter=*.*Test,*.*case* 匹配所有测试类中以 Test 结尾的用例，或者所有测试类中名字中带有 case 的测试用例'
+                                        '--filter=MyTest*.*Test,*.*case*,-*.*myTest 匹配所有 MyTest 开头测试类中以 Test 结尾的用例，或者名字中带有 case 的用例，或者名字中不带有 myTest 的测试用例')
     sub_sub_ut_parser.add_argument("--random-seed", type=int, help='<N> 用来指定随机种子的值')
     sub_sub_ut_parser.add_argument("--no-color", action='store_true', help=' 关闭控制台颜色显示')
     sub_sub_ut_parser.add_argument("--isolate-all", action='store_true', help='对所有用例进行独立测试（即单个用例单进程测试，详见标准库手册中的选项说明）')
     sub_sub_ut_parser.add_argument("--isolate-all-timeout", type=str, help='用于对所有用例进行独立测试（即单个用例单进程测试）并指定超时时间')
     sub_ut_parser.add_argument("-m", "--merage", action='store_true', help='该命令不能其他命令共存, 用于把UT测试用例和源码进行合并, 并把源码进行备份')
-    sub_ut_parser.add_argument("-b", "--back", action='store_true', help='该命令不能其他命令共存, 和-m命令互为相反命令, 把UT测试用例和源码进行分开, 首先要保证test/UT中存在该测试用例')
+    sub_ut_parser.add_argument("-b", "--back", action='store_true',
+                               help='该命令不能其他命令共存, 和-m命令互为相反命令, 把UT测试用例和源码进行分开, 首先要保证test/UT中存在该测试用例')
 
     cjlint_parser = sub_parser.add_parser("cjlint", help="cjlint检查工具命令")
     cjlint_parser.set_defaults(func=cjlint_check)
@@ -165,6 +169,7 @@ def bench_mark(args):
     args.optimize = '-O2'
     HLTtest(args, cfgs)
 
+
 def count(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     count_func = 0
@@ -221,7 +226,7 @@ def fuzz_test(args):
 
 
 def cjtest(args):
-    #os.popen('{} -v'.format(master_cjc))
+    # os.popen('{} -v'.format(master_cjc))
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if args.coverage:
         args.optimize = '-O0 --coverage'
@@ -305,9 +310,10 @@ def cangjie_doc(args):
         dir = os.path.join(cfgs.BASE_DIR, "cangjiedoc")
     clear = 'false' if args.clear == False else "true"
     output = subprocess.Popen(
-        '{} -s {} -o {} -c {}'.format(str(dir), args.source, args.output, clear), shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE
+        '{} -s {} -o {} -c {}'.format(str(dir), args.source, args.output, clear), shell=True, stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE
     )
-    log_output(output, output.args,cfgs)
+    log_output(output, output.args, cfgs)
 
 
 def build(args):
@@ -324,7 +330,7 @@ def test(args):
         cfgs.LOG.error("单跑用例和单跑指定文件夹, 不能同时设置. ")
         exit(1)
     elif args.path:
-        if os.path.exists(args.path) :
+        if os.path.exists(args.path):
             if not os.path.isabs(args.path):
                 args.path = os.path.join(cfgs.HOME_DIR, args.path)
         else:
@@ -358,9 +364,11 @@ def __find_cjpm_home_librarys(args, cfgs):
         parms = parse(open(os.path.join(cfgs.HOME_DIR, "cjpm.lock"), "r", encoding='UTF-8').read())
         sss = ''
         for key, value in parms['requires'].items():
-            for k,v in value.items():
+            for k, v in value.items():
                 if k == 'commitId':
-                    str_lib = __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, os.path.join(cfgs.BUILD_CJPM_PATH, key, v))
+                    str_lib = __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs,
+                                                                                 os.path.join(cfgs.BUILD_CJPM_PATH, key,
+                                                                                              v))
                     sub_lib = os.path.join(cfgs.BUILD_CJPM_PATH, key, v, str_lib)
                     if os.path.exists(sub_lib):
                         sss = f' -L {sub_lib} '
@@ -389,22 +397,22 @@ def __get_windows_c_lib_arr(cfgs, sub_lib):
 
 
 def __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, that_lib_path):
-    if cfgs.BUILD_BIN != "build" and os.path.exists(os.path.join(that_lib_path,"cjpm.toml")):
-        parm = parse(open(os.path.join(that_lib_path,"cjpm.toml"), "r", encoding='UTF-8').read())
+    if cfgs.BUILD_BIN != "build" and os.path.exists(os.path.join(that_lib_path, "cjpm.toml")):
+        parm = parse(open(os.path.join(that_lib_path, "cjpm.toml"), "r", encoding='UTF-8').read())
         if parm.get('ffi') is not None:
             for key, value in parm['ffi'].items():
                 if key == "c":
                     for ke, val in value.items():
                         for k, v in val.items():
                             if k == 'path':
-                                return str(v).replace('./','').replace('/', os.path.sep)
+                                return str(v).replace('./', '').replace('/', os.path.sep)
     else:
         # json
         parm = json.load(open(os.patn.join(that_lib_path, "module.json"), 'r', encoding='UTF-8'))
         for ke, val in parm["foreign_requires"].items():
             for k, v in val.items():
                 if k == 'path':
-                    return str(v).replace('./','').replace('/', os.path.sep)
+                    return str(v).replace('./', '').replace('/', os.path.sep)
     return 'lib'
 
 
@@ -426,7 +434,7 @@ def config_cjc(args):
             cfgs.EXPECT_CJC_VERSION = parm['cjc_version']
     except:
         cfgs.LOG.warn("本项目没有配置文件module.json和cjpm.toml")
-    #使用命令行指定的cjc进行构建测试
+    # 使用命令行指定的cjc进行构建测试
     cfgs.BUILD_CJPM_PATH = get_cangjie_path(cfgs, 'cjpm')
     if cfgs.BUILD_CJPM_PATH == '':
         if cfgs.OS_PLATFORM == "windows":
@@ -455,7 +463,7 @@ def config_cjc(args):
     h_cjc_version_arr = cfgs.BASE_CJC_VERSION.split(".")
     cfgs.CANGJIE_TARGET = out.split('Target: ')[1].replace('\n', '').replace('\r', '')
     h_cjc_version = float(h_cjc_version_arr[0])
-    if float(h_cjc_version_arr[1]) != 0 :
+    if float(h_cjc_version_arr[1]) != 0:
         h_cjc_version += float(f'0.{h_cjc_version_arr[1]}')
     if h_cjc_version < 0.49:
         cfgs.set_build_bin("build")
@@ -491,14 +499,21 @@ def config_cjc(args):
                     targ = "stdx"
 
                 if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                    cfgs.LOG.info("stdx路径不存在: "+ os.path.join(Path(master_cjc).parent.parent, targ))
-                    exit(1)
+                    if args.update_stdx:
+                        cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx")
+                        output = subprocess.Popen(f"wget -q '{cfgs.get_stdx_url()}' --no-check-certificate -O stdx.zip >/dev/null 2>&1",
+                                         shell=True, cwd=os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                        output.communicate()
+                        output = subprocess.Popen("unzip stdx.zip && rm stdx.zip",
+                                         shell=True, cwd=os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+                        output.communicate()
+                    if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
+                        cfgs.LOG.info("stdx路径不存在: " + os.path.join(Path(master_cjc).parent.parent, targ))
+                        exit(1)
                 cfgs.CANGJIE_STDX_PATH = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
             __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_PATH)
         else:
             cfgs.LOG.info("仓颉版本小于0.60.*")
-
-
 
 
 def init_log(cfgs, name):
@@ -522,14 +537,16 @@ def init_log(cfgs, name):
     log.addHandler(filehandler)
     return log
 
+
 def parser_maple_test_config_file(cfgs):
     cfg = read_config(complete_path(os.path.join(cfgs.BASE_DIR, "ci_test.cfg")))
-    cfgs.temp_dir = complete_path(os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "running", "temp_dir", default="../test_temp/run")))
-    cfgs.log_dir = complete_path(os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "logging", "name", default="../test_temp/log")))
+    cfgs.temp_dir = complete_path(
+        os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "running", "temp_dir", default="../test_temp/run")))
+    cfgs.log_dir = complete_path(
+        os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "logging", "name", default="../test_temp/log")))
     cfgs.level = get_config_value(cfg, "logging", "level", default="INFO")
     cfgs.UPDATE_CJPM_TOML = get_config_value(cfg, "cangjie-home", "update_toml", default="false") == "true"
     cfgs.BUILD_CI_TEST_CFG = cfg
-
 
 
 ###  BUILD
@@ -581,10 +598,10 @@ def __load_c_library(args, cfgs):
                                 os.path.join(cfgs.HOME_DIR, cfgs.CUSTOM_MAP['ci_lib'], files))
         else:
             for entry in entries:
-                shutil.copyfile(os.path.join(ffi_bin_path, entry), os.path.join(cfgs.HOME_DIR, cfgs.CUSTOM_MAP['ci_lib'], entry))
+                shutil.copyfile(os.path.join(ffi_bin_path, entry),
+                                os.path.join(cfgs.HOME_DIR, cfgs.CUSTOM_MAP['ci_lib'], entry))
     else:
         cfgs.LOG.error("已配置ci_lib, clone时未找到该文件.")
-
 
 
 # 删除后缀名文件
@@ -629,8 +646,8 @@ def get_cjc_cpm(cfgs):
         else:
             return 'cpm'
     except IndexError:
-       cfgs.LOG.error("没有配置cangjie环境变量, 请配置后再试, ciTest build --cj-home=CangjiePath;")
-       exit(1)
+        cfgs.LOG.error("没有配置cangjie环境变量, 请配置后再试, ciTest build --cj-home=CangjiePath;")
+        exit(1)
 
 
 def cjpmbuild(args, cfgs):
@@ -674,7 +691,6 @@ def cjpmbuild(args, cfgs):
         exit(output.returncode)
 
 
-
 def __do_cjpm_build(args, cfgs):
     if args.full:
         cmd0 = "{} update".format(get_cjc_cpm(cfgs))
@@ -704,7 +720,7 @@ def __do_cjpm_build(args, cfgs):
         _get_DEVECO_CANGJIE_HOME(cfgs)
         cmd1 += " --target=aarch64-linux-ohos"
     return subprocess.Popen(cmd1, shell=True, cwd=cfgs.HOME_DIR, stderr=subprocess.PIPE,
-                              stdout=subprocess.PIPE)
+                            stdout=subprocess.PIPE)
     # return log_output(output, output.args,cfgs, cfgs.HOME_DIR)
 
 
@@ -721,7 +737,6 @@ def __loop_down_load_cjpm_librarys(cfgs, sub_librarys):
                 cfgs.LOG.warn("没有项目工程配置文件, 请配置module.json或者cjpm.toml配置文件")
         else:
             __cjpm_git_download_json(cfgs, sub_library, sub_library_config_file)
-
 
 
 def __cjpm_git_download_json(cfgs, sub_library, sub_library_config_file):
@@ -759,16 +774,16 @@ def __cjpm_git_download_toml(cfgs, sub_library, sub_library_config_file):
                     if k == 'path':
                         cmd0 = f"git clone -b lib_{name} {gitee} {os.path.join(cfgs.BASE_DIR, f'lib_{name}')} --depth=1"
                         output = subprocess.Popen(cmd0, shell=True, cwd=cfgs.BASE_DIR, stderr=subprocess.PIPE,
-                                         stdout=subprocess.PIPE)
+                                                  stdout=subprocess.PIPE)
                         log_output(output, output.args, cfgs, cfgs.HOME_DIR)
-                        old_dir = os.path.join(cfgs.BASE_DIR, "lib_{}".format(name), cfgs.OS_PLATFORM, "lib", f"lib_{name}")
+                        old_dir = os.path.join(cfgs.BASE_DIR, "lib_{}".format(name), cfgs.OS_PLATFORM, "lib",
+                                               f"lib_{name}")
                         new_dir = os.path.join(sub_library, "lib")
                         try:
                             shutil.copytree(old_dir, new_dir)
                         except:
                             shutil.rmtree(new_dir)
                             shutil.copytree(old_dir, new_dir)
-
 
 
 def envsetup(args, cfgs):
@@ -819,7 +834,7 @@ def envsetup(args, cfgs):
             cjc_home = os.path.join(args.cj_home, env_cjc)
         else:
             # 使用 默认 最新cjc 版本
-            max_version = 0 #float(str(lists[0]).replace(".", ""))
+            max_version = 0  # float(str(lists[0]).replace(".", ""))
             index = 0
             for li in lists:
                 try:
@@ -1127,14 +1142,14 @@ def cjlint_run(args, cfgs, out_type='json'):
     if 'grpc' in str(cfgs.HOME_DIR):
         cmd = "cjlint -f {}/src -r {} -o {}/report".format(cfgs.HOME_DIR, out_type, cfgs.HOME_DIR)
         output = subprocess.Popen(cmd, shell=True, cwd=os.path.dirname(cfgs.HOME_DIR), stderr=PIPE, stdout=PIPE)
-        log_output(output, output.args,cfgs, cfgs.HOME_DIR)
+        log_output(output, output.args, cfgs, cfgs.HOME_DIR)
         if not os.path.exists("{}/report.{}".format(cfgs.HOME_DIR, out_type)):
             cfgs.LOG.info("check fail.")
             exit(1)
         cfgs.LOG.info("check success.")
     else:
         ohos_paths = []
-        if os.path.exists(os.path.join(cfgs.HOME_DIR, "build-profile.json5")) :
+        if os.path.exists(os.path.join(cfgs.HOME_DIR, "build-profile.json5")):
             ohos_json = open(os.path.join(cfgs.HOME_DIR, "build-profile.json5"), "r", encoding='UTF-8')
             for line in ohos_json.readlines():
                 if line.strip().startswith('"srcPath":'):
@@ -1340,7 +1355,7 @@ def runOne(args, file, subcmd, cfgs):
                         error = int(
                             str(out).split("Summary: TOTAL:")[1].split("ERROR: ")[1].split(cfgs.LINE_SEPARATOR)[0])
                         try:
-                            failed = int( out.split("Summary: TOTAL:")[1].split("FAILED: ")[1].split(",")[0])
+                            failed = int(out.split("Summary: TOTAL:")[1].split("FAILED: ")[1].split(",")[0])
                         except ValueError:
                             failed = 0
                         if failed > 0 or error > 0:
@@ -1568,7 +1583,7 @@ def end_build(cfgs):
     cfgs.LOG.info("")
     cfgs.LOG.info("  TestSuiteTask: Total: {}, PASS: {}, FAIL: {}, Ratio  : {}%".format(str(a + b), str(b), str(a),
                                                                                         round(b / (a + b) * 100, 2) if (
-                                                                                        a + b) > 0 else 0))
+                                                                                                                               a + b) > 0 else 0))
     if a:
         exit(1)
 
@@ -1802,12 +1817,12 @@ def run_one_case(args, file_path, run_option, compile_option, target, cfgs):
     logger.setStream(f"{os.path.basename(file_path)}.log")
     target_cmd = ""
     if target == "ohos":
-        if cfgs.OHOS_VERSION >= 4.0: # 4.0 使用 deveco
+        if cfgs.OHOS_VERSION >= 4.0:  # 4.0 使用 deveco
             if cfgs.OHOS_CANGJIE_PATH is None:
                 logger.error("please set OHOS_ROOT")
                 return
             target_cmd = f"--target=aarch64-linux-ohos {cfgs.OHOS_CMD}"
-        else: # 4.0 一下 使用 原始工具链
+        else:  # 4.0 一下 使用 原始工具链
             if cfgs.OHOS_CANGJIE_PATH is None:
                 logger.error("please set OHOS_ROOT")
                 return
@@ -2209,7 +2224,7 @@ def HLTtest(args, cfgs):
         cfgs.run_cmd(f"hdc shell rm -rf {ohos_dir};mkdir {ohos_dir};chmod -R 777 {ohos_dir}")
         if cfgs.BUILD_PARMS.get("target") is not None and cfgs.BUILD_PARMS["target"].get("aarch64-linux-ohos") \
                 is not None and cfgs.BUILD_PARMS["target"]["aarch64-linux-ohos"].get("compile-option") is not None:
-            cfgs.OHOS_CMD = str(cfgs.BUILD_PARMS["target"]["aarch64-linux-ohos"]["compile-option"])\
+            cfgs.OHOS_CMD = str(cfgs.BUILD_PARMS["target"]["aarch64-linux-ohos"]["compile-option"]) \
                 .replace('${DEVECO_CANGJIE_HOME}', f'{os.environ["DEVECO_CANGJIE_HOME"]}').replace('\\', '/')
     cfgs.libs_3rd = []
     cfgs.import_cmd = set()
@@ -2235,5 +2250,3 @@ def HLTtest(args, cfgs):
             exit(gen_report(args, cfgs))
     except AttributeError:
         exit(gen_report(args, cfgs))
-
-
