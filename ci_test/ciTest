@@ -14,7 +14,7 @@ if __name__ == '__main__':
     cof.HOME_DIR = os.getcwd()
     cof.LIB_DIR = None
     cof.TEST_DIR = os.path.join(os.getcwd(), 'test')
-    cof.ENCODING = locale.getlocale()[1] # ('en_US', 'UTF-8')
+    cof.ENCODING = locale.getpreferredencoding(False) # ('en_US', 'UTF-8')
     cof.FILE_ROOT = os.path.join(Path(__file__).parent.absolute())
     cof.HOME = Path(__file__).parent.absolute()
     cof.CANGJIE_SOURCE_DIR = os.path.join(cof.HOME_DIR, 'src')
