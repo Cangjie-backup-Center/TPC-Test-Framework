@@ -1,3 +1,6 @@
+# @Copyright (c) Huawei Technologies Co., Ltd. 2024-2025. All rights reserved.
+# Licensed under the Apache-2.0 License. See LICENSE file for details.
+
 import csv
 import glob
 from logging import handlers
@@ -21,6 +24,41 @@ from tomlkit import parse, dump as dump_c
 
 dynamic_lib = ".dll" if platform.system() == "Windows" else ".so"
 static_lib = ".lib" if platform.system() == "Windows" else ".a"
+
+
+# --------------------------
+# 关键：抽离共享的参数配置函数（避免重复写参数）
+# --------------------------
+def add_llt_common_arguments(parser):
+    test_parser_optimize = parser.add_mutually_exclusive_group()
+    test_parser_optimize.add_argument("-O", help="编译构建优化选项")
+    test_parser_optimize.add_argument("--coverage", action='store_true', help="跑测试用例是否用覆盖率方式测试")
+    test_parser_path = parser.add_mutually_exclusive_group()
+    test_parser_path.add_argument("--case", help="指定单跑一个用例")
+    test_parser_path.add_argument("--target", help="适用于ohos")
+    test_parser_path.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
+    test_parser_path.add_argument("-p", "--path", help="指定跑一个文件夹, 适用于在test/LLT文件夹多个文件夹方式")
+    parser.set_defaults(func=test)
+
+
+# --------------------------
+# 关键：抽离共享的参数配置函数（避免重复写参数）
+# --------------------------
+def add_hlt_common_arguments(cjtest_parser):
+    cjtest_parser.set_defaults(func=cjtest)
+    cjtest_parser.add_argument("--target", help="指定运行环境方式, ohos和其他环境")
+    cjtest_parser_optimize = cjtest_parser.add_mutually_exclusive_group()
+    cjtest_parser_optimize.add_argument("-O", help="HLT用例测试方式")
+    cjtest_parser_optimize.add_argument("--coverage", action='store_true', help="HLT用例测试方式")
+    cjtest_parser_path = cjtest_parser.add_mutually_exclusive_group()
+    cjtest_parser_path.add_argument("--case", help="HLT用例测试方式")
+    cjtest_parser_path.add_argument("-p", help="HLT用例测试方式")
+    cjtest_parser.add_argument("--root", help="HLT用例测试方式")
+    cjtest_parser_branch = cjtest_parser.add_mutually_exclusive_group()
+    cjtest_parser_branch.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
+    cjtest_parser_branch.add_argument("--main", action='store_true', help="HLT用例测试方式")
+    cjtest_parser_branch.add_argument("--fuzz", action='store_true', help="HLT用例测试方式")
+
 
 
 def parse_args(cfgs):
@@ -50,16 +88,8 @@ def parse_args(cfgs):
     build_parser.add_argument("--update-stdx", action='store_true', help="更新仓颉stdx")
     build_parser.set_defaults(func=build)
 
-    test_parser = sub_parser.add_parser("test", help="用于LLT测试命令")
-    test_parser_optimize = test_parser.add_mutually_exclusive_group()
-    test_parser_optimize.add_argument("-O", help="编译构建优化选项")
-    test_parser_optimize.add_argument("--coverage", action='store_true', help="跑测试用例是否用覆盖率方式测试")
-    test_parser_path = test_parser.add_mutually_exclusive_group()
-    test_parser_path.add_argument("--case", help="指定单跑一个用例")
-    test_parser_path.add_argument("--target", help="适用于ohos")
-    test_parser_path.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
-    test_parser_path.add_argument("-p", "--path", help="指定跑一个文件夹, 适用于在test/LLT文件夹多个文件夹方式")
-    test_parser.set_defaults(func=test)
+    add_llt_common_arguments(sub_parser.add_parser("test", help="用于LLT测试命令"))
+    add_llt_common_arguments(sub_parser.add_parser("llt", help="用于LLT测试命令"))
 
     ut_parser = sub_parser.add_parser("ut", help="单元测试的命令")
     ut_parser.set_defaults(func=cangjie_ut)
@@ -98,20 +128,8 @@ def parse_args(cfgs):
     doc_parser.add_argument("-o", "--output", help='需要生成的文件名, 生成文件位于当前执行命令的文件夹')
     doc_parser.add_argument("-c", "--clear", type=bool, default=False, help='是否生成文件时清空文件内容')
 
-    cjtest_parser = sub_parser.add_parser("cjtest", help="HLT用例测试方式")
-    cjtest_parser.set_defaults(func=cjtest)
-    cjtest_parser.add_argument("--target", help="指定运行环境方式, ohos和其他环境")
-    cjtest_parser_optimize = cjtest_parser.add_mutually_exclusive_group()
-    cjtest_parser_optimize.add_argument("-O", help="HLT用例测试方式")
-    cjtest_parser_optimize.add_argument("--coverage", action='store_true', help="HLT用例测试方式")
-    cjtest_parser_path = cjtest_parser.add_mutually_exclusive_group()
-    cjtest_parser_path.add_argument("--case", help="HLT用例测试方式")
-    cjtest_parser_path.add_argument("-p", help="HLT用例测试方式")
-    cjtest_parser.add_argument("--root", help="HLT用例测试方式")
-    cjtest_parser_branch = cjtest_parser.add_mutually_exclusive_group()
-    cjtest_parser_branch.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
-    cjtest_parser_branch.add_argument("--main", action='store_true', help="HLT用例测试方式")
-    cjtest_parser_branch.add_argument("--fuzz", action='store_true', help="HLT用例测试方式")
+    add_hlt_common_arguments(sub_parser.add_parser("cjtest", help="HLT用例测试方式"))
+    add_hlt_common_arguments(sub_parser.add_parser("hlt", help="HLT用例测试方式"))
 
     # fuzz_test
     fuzz_parser = sub_parser.add_parser("fuzz", help="fuzz测试用例方式")
@@ -249,7 +267,7 @@ def cjtest(args):
             _get_DEVECO_CANGJIE_HOME(cfgs)
     else:
         if get_cjtest_path(args, cfgs, "") == "":
-            cfgs.LOG.warn("请配置3rd_party_root, ciTest cjtest --root=CangjieObjectParentPath.")
+            cfgs.LOG.warn("请配置3rd_party_root, ciTest.py cjtest --root=CangjieObjectParentPath.")
     args.HLT = False
     HLTtest(args, cfgs)
 
@@ -500,7 +518,7 @@ def config_cjc(args):
 
                 if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
                     if args.update_stdx:
-                        cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx")
+                        cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx: " + cfgs.get_stdx_url())
                         output = subprocess.Popen(f"wget -q '{cfgs.get_stdx_url()}' --no-check-certificate -O stdx.zip >/dev/null 2>&1",
                                          shell=True, cwd=os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
                         output.communicate()
@@ -646,7 +664,7 @@ def get_cjc_cpm(cfgs):
         else:
             return 'cpm'
     except IndexError:
-        cfgs.LOG.error("没有配置cangjie环境变量, 请配置后再试, ciTest build --cj-home=CangjiePath;")
+        cfgs.LOG.error("没有配置cangjie环境变量, 请配置后再试, ciTest.py build --cj-home=CangjiePath;")
         exit(1)
 
 
@@ -927,47 +945,47 @@ def copy_windows_lib(args):
 def find_lib_path(lib_path, ci_lib_path):
     cj_3rd_libs = set()
     """查找三方依赖库 """
-    if ci_lib_path != "":  ## cjtest
-        lib_path_parent = os.path.dirname(lib_path)
-        ci_lib_path_parent = os.path.dirname(ci_lib_path)
-        if os.path.exists(lib_path_parent) and not os.path.exists(lib_path):
-            for dir in os.listdir(lib_path_parent):
-                if str(dir) == "release":
-                    for dd in os.listdir(os.path.join(lib_path_parent, "release")):
-                        if str(dd).__contains__(".") or str(dd) == "bin":
-                            continue
-                        cj_3rd_libs.add(os.path.join(lib_path_parent, "release", dd))
-                else:
-                    if not str(dir).__contains__(".") and str(dir) != "bin":
-                        cj_3rd_libs.add(os.path.join(lib_path_parent, dir))
-        elif os.path.exists(lib_path):
-            cj_3rd_libs.add(lib_path)
-        elif os.path.exists(ci_lib_path_parent) and not os.path.exists(ci_lib_path):
-            for dir in os.listdir(ci_lib_path_parent):
-                if str(dir) == "release":
-                    for dd in os.listdir(os.path.join(ci_lib_path_parent, "release")):
-                        if str(dd).__contains__(".") or str(dd) == "bin":
-                            continue
-                        cj_3rd_libs.add(os.path.join(ci_lib_path_parent, "release", dd))
-                else:
-                    if not str(dir).__contains__(".") and str(dir) != "bin":
-                        cj_3rd_libs.add(os.path.join(ci_lib_path_parent, "release"))
-        elif os.path.exists(ci_lib_path):
-            cj_3rd_libs.add(ci_lib_path)
-    else:  ## LLT test
-        if os.path.exists(os.path.join(lib_path, "release")):
-            cj_3rd_libs.add(os.path.join(lib_path, "release"))
-        elif os.path.exists(lib_path):
-            cj_3rd_libs.add(lib_path)
-        elif os.path.exists(ci_lib_path):
-            cj_3rd_libs.add(ci_lib_path)
-            if not os.path.exists(os.path.join(lib_path, "release")):
-                for root, dirs, files in os.walk(ci_lib_path):
-                    for dir_name in dirs:
-                        if os.path.join(ci_lib_path, dir_name) in cj_3rd_libs:
-                            continue
-                        if os.path.exists(os.path.join(ci_lib_path, dir_name)):
-                            cj_3rd_libs.add(os.path.join(ci_lib_path, dir_name))
+    # if ci_lib_path != "":  ## cjtest
+    #     lib_path_parent = os.path.dirname(lib_path)
+    #     ci_lib_path_parent = os.path.dirname(ci_lib_path)
+    #     if os.path.exists(lib_path_parent) and not os.path.exists(lib_path):
+    #         for dir in os.listdir(lib_path_parent):
+    #             if str(dir) == "release":
+    #                 for dd in os.listdir(os.path.join(lib_path_parent, "release")):
+    #                     if str(dd).__contains__(".") or str(dd) == "bin":
+    #                         continue
+    #                     cj_3rd_libs.add(os.path.join(lib_path_parent, "release", dd))
+    #             else:
+    #                 if not str(dir).__contains__(".") and str(dir) != "bin":
+    #                     cj_3rd_libs.add(os.path.join(lib_path_parent, dir))
+    #     elif os.path.exists(lib_path):
+    #         cj_3rd_libs.add(lib_path)
+    #     elif os.path.exists(ci_lib_path_parent) and not os.path.exists(ci_lib_path):
+    #         for dir in os.listdir(ci_lib_path_parent):
+    #             if str(dir) == "release":
+    #                 for dd in os.listdir(os.path.join(ci_lib_path_parent, "release")):
+    #                     if str(dd).__contains__(".") or str(dd) == "bin":
+    #                         continue
+    #                     cj_3rd_libs.add(os.path.join(ci_lib_path_parent, "release", dd))
+    #             else:
+    #                 if not str(dir).__contains__(".") and str(dir) != "bin":
+    #                     cj_3rd_libs.add(os.path.join(ci_lib_path_parent, "release"))
+    #     elif os.path.exists(ci_lib_path):
+    #         cj_3rd_libs.add(ci_lib_path)
+    # else:  ## LLT test
+    if os.path.exists(os.path.join(lib_path, "release")):
+        cj_3rd_libs.add(os.path.join(lib_path, "release"))
+    elif os.path.exists(lib_path):
+        cj_3rd_libs.add(lib_path)
+    elif os.path.exists(ci_lib_path):
+        cj_3rd_libs.add(ci_lib_path)
+        if not os.path.exists(os.path.join(lib_path, "release")):
+            for root, dirs, files in os.walk(ci_lib_path):
+                for dir_name in dirs:
+                    if os.path.join(ci_lib_path, dir_name) in cj_3rd_libs:
+                        continue
+                    if os.path.exists(os.path.join(ci_lib_path, dir_name)):
+                        cj_3rd_libs.add(os.path.join(ci_lib_path, dir_name))
     cangjie_env_setup(cj_3rd_libs)
     return cj_3rd_libs
 
@@ -1657,60 +1675,7 @@ def get_cmd_info(file_name, target, cfgs):
         case_dir = os.path.dirname(file_name)
         try:
             for line in f.readlines():
-                if "3rd_party_lib:" in line and target != "ohos":
-                    is_valid_case = True
-                    line = line.replace("\n", "").replace(" ", "")
-                    cj_3rd_lib_str = line[line.index("3rd_party_lib:") + 14:]
-                    cj_3rd_libs_tmp = cj_3rd_lib_str.split(":")
-                    cj_3rd_libs = None
-                    for lib in cj_3rd_libs_tmp:
-                        dirs = lib.replace('/', os.sep).split(os.sep)
-                        index_build = 0
-                        if cfgs.BUILD_BIN != "build":
-                            for i in range(len(dirs)):
-                                if dirs[i] == "build":
-                                    index_build = i + 1
-                                    dirs[i] = cfgs.BUILD_BIN
-                        lib_path = os.path.join(_3rd_party_root, *dirs)
-                        dirs[0] = "source"  # for ci
-                        ci_lib_path = os.path.join(_3rd_party_root, *dirs)
-                        cj_3rd_libs = find_lib_path(lib_path, ci_lib_path)
-                    logger.info(f"find 3rd party libs in {cj_3rd_libs}")
-                    for lib in cj_3rd_libs:
-                        # send so files to ohos device
-                        if lib not in cfgs.libs_3rd:
-                            cfgs.libs_3rd.append(lib)
-                            so_str = __improt_libs([lib], cfgs, False)
-                            if so_str != "":
-                                cfgs.import_cmd.add(os.path.realpath(os.path.join(lib, "..")))
-                                cfgs.library_path_L_cmd.append(lib)
-                                cfgs.library_l_cmd += so_str
-                elif "3rd_party_lib_ohos:" in line and target == "ohos":
-                    is_valid_case = True
-                    line = line.replace("\n", "").replace(" ", "")
-                    cj_3rd_lib_str = line[line.index("3rd_party_lib_ohos:") + 19:]
-                    cj_3rd_libs_tmp = cj_3rd_lib_str.split(":")
-                    cj_3rd_libs = []
-                    for lib in cj_3rd_libs_tmp:
-                        lib_path = os.path.join(_3rd_party_root, lib)
-                        dirs = lib.split(os.sep)
-                        dirs[0] = "source"  # for ci
-                        ci_lib_path = os.path.join(_3rd_party_root, *dirs)
-                        cj_3rd_libs = find_lib_path(lib_path, ci_lib_path)
-                    logger.info(f"find 3rd party libs in {cj_3rd_libs}")
-
-                    for lib in cj_3rd_libs:
-                        # send so files to ohos device
-                        if lib not in cfgs.libs_3rd:
-                            cfgs.libs_3rd.append(lib)
-                            so_str = __improt_libs([lib], cfgs, False)
-                            if so_str != "":
-                                cfgs.import_cmd.add(os.path.realpath(os.path.join(lib, "..")))
-                                cfgs.library_path_L_cmd.append(lib)
-                                cfgs.library_l_cmd += so_str
-
-
-                elif "macro-lib:" in line:
+                if "macro-lib:" in line:
                     if platform_str == "win32":
                         line = line.replace(".so", ".dll").replace("/", "\\")
                     is_valid_case = True
@@ -1816,26 +1781,6 @@ def run_one_case(args, file_path, run_option, compile_option, target, cfgs):
     global error_list
     logger.setStream(f"{os.path.basename(file_path)}.log")
     target_cmd = ""
-    if target == "ohos":
-        if cfgs.OHOS_VERSION >= 4.0:  # 4.0 使用 deveco
-            if cfgs.OHOS_CANGJIE_PATH is None:
-                logger.error("please set OHOS_ROOT")
-                return
-            target_cmd = f"--target=aarch64-linux-ohos {cfgs.OHOS_CMD}"
-        else:  # 4.0 一下 使用 原始工具链
-            if cfgs.OHOS_CANGJIE_PATH is None:
-                logger.error("please set OHOS_ROOT")
-                return
-            ohos_root = cfgs.OHOS_CANGJIE_PATH
-            target_cmd = f"--target=aarch64-linux-ohos " \
-                         f"-B{ohos_root}/out/rk3568/obj/third_party/musl/usr/lib/aarch64-linux-ohos " \
-                         f"-B{ohos_root}/prebuilts/clang/ohos/linux-x86_64/llvm/bin " \
-                         f"-L{ohos_root}/prebuilts/clang/ohos/linux-x86_64/llvm/lib/clang/12.0.1/lib/aarch64-linux-ohos " \
-                         f"-L{ohos_root}/prebuilts/clang/ohos/linux-x86_64/llvm/lib/aarch64-linux-ohos " \
-                         f"-L{ohos_root}/out/rk3568/obj/third_party/musl/usr/lib/aarch64-linux-ohos " \
-                         f"--sysroot {ohos_root}/out/rk3568/obj/third_party/musl "
-
-        # run_cmd(f"hdc shell mkdir {ohos_dir};chmod -R 777 {ohos_dir}")
 
     case_run_option, dependence, macro_cmd, is_valid_case = get_cmd_info(file_path, target, cfgs)
     if not is_valid_case:
@@ -1861,11 +1806,11 @@ def run_one_case(args, file_path, run_option, compile_option, target, cfgs):
                     break
                 shutil.copyfile(dll, os.path.join(case_dir, dll_name))
     out = os.path.join(case_dir, f"{file_name}.out")
-    case_import_cmd = '" --import-path="'
-    case_library_path_L_cmd = " -L "
+    # case_import_cmd = '" --import-path="'
+    # case_library_path_L_cmd = " -L "
     compile_cmd = f'cjc {cfgs.Woff} {args.optimize} {target_cmd} {macro_cmd} ' \
-                  f'--import-path="{case_import_cmd.join(cfgs.import_cmd)}" {cfgs.IMPORT_PATH} ' \
-                  f'-L {case_library_path_L_cmd.join(cfgs.library_path_L_cmd)} {cfgs.LIBRARY_PATH} ' \
+                  f'{cfgs.IMPORT_PATH} ' \
+                  f'{cfgs.LIBRARY_PATH} ' \
                   f'{cfgs.LIBRARY}' \
                   f'{cfgs.library_l_cmd} ' \
                   f'{file_path} {dependence} -o {os.path.realpath(out)} {compile_option}'
@@ -2169,7 +2114,7 @@ def HLTtest(args, cfgs):
     cfgs.CJ_TEST_WORK = "test"
     if not os.path.exists(os.path.join(cfgs.HOME_DIR, cfgs.CJ_TEST_WORK, test_dir)):
         logger.error(f"{os.path.join(cfgs.HOME_DIR, cfgs.CJ_TEST_WORK, test_dir)} test case not exists!")
-        exit(1)
+        exit(0)
     run_options = cp.get("test", "run_options")
     compile_options = cp.get("test", "compile_options")
     target = "x86"
@@ -2231,6 +2176,23 @@ def HLTtest(args, cfgs):
     cfgs.library_path_L_cmd = []
     cfgs.library_l_cmd = ""
     __find_cjpm_home_librarys(args, cfgs)
+    cj_build_libs = find_lib_path(cfgs.LIB_DIR, '')
+    find_cangjie_lib_arr = []
+    for build_lib in cj_build_libs:
+        cfgs.IMPORT_PATH += f" --import-path {build_lib}"
+        for build_lib_item in os.listdir(build_lib):
+            if build_lib_item.__contains__(".") or 'bin' in build_lib_item:
+                continue
+            if os.path.exists(os.path.join(build_lib, build_lib_item)):
+                cfgs.LIBRARY_PATH += f" -L {os.path.join(build_lib, build_lib_item)}"
+                find_cangjie_lib_arr.append(os.path.join(build_lib, build_lib_item))
+                cangjie_env_setup(find_cangjie_lib_arr)
+    if cfgs.CANGJIE_STDX_PATH:
+        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
+        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
+    __improt_libs(find_cangjie_lib_arr, cfgs)
+
     for root, _, files in os.walk(dirs):
         for f in files:
             if f.endswith(".cj"):

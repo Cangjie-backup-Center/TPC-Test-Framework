@@ -1,4 +1,6 @@
-import configparser
+# @Copyright (c) Huawei Technologies Co., Ltd. 2024-2025. All rights reserved.
+# Licensed under the Apache-2.0 License. See LICENSE file for details.
+
 import json
 import os
 import re
@@ -25,6 +27,14 @@ class ArgConfig:
                 "x86_64-unknown-linux-gnu":"https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-linux-x64-1.0.1.1.zip",
                 "x86_64-linux-ohos": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-ohos-x64-1.0.1.1.zip",
                 "windows": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-windows-x64-1.0.1.1.zip"
+            },
+        "1.0.3":
+            {
+                "aarch64-linux-ohos": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-ohos-aarch64-1.0.1.1.zip",  # TODO 未发现release版本
+                "aarch64": "https://gitcode.com/Cangjie/cangjie_stdx/releases/download/v1.0.3.1/cangjie-stdx-linux-aarch64-1.0.3.1.zip",
+                "x86_64-unknown-linux-gnu":"https://gitcode.com/Cangjie/cangjie_stdx/releases/download/v1.0.3.1/cangjie-stdx-linux-x64-1.0.3.1.zip",
+                "x86_64-linux-ohos": "https://gitcode.com/Cangjie/cangjie-stdx-bin/releases/download/v1.0.1.1/cangjie-stdx-ohos-x64-1.0.1.1.zip",  # TODO 未发现release版本
+                "windows": "https://gitcode.com/Cangjie/cangjie_stdx/releases/download/v1.0.3.1/cangjie-stdx-windows-x64-1.0.3.1.zip"
             },
     }
     BUILD_TYPE = None
