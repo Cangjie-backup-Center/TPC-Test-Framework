@@ -1675,7 +1675,9 @@ def get_cmd_info(file_name, target, cfgs):
         case_dir = os.path.dirname(file_name)
         try:
             for line in f.readlines():
-                if "macro-lib:" in line:
+                if "3rd_party_lib:" in line:
+                    is_valid_case = True
+                elif "macro-lib:" in line:
                     if platform_str == "win32":
                         line = line.replace(".so", ".dll").replace("/", "\\")
                     is_valid_case = True
