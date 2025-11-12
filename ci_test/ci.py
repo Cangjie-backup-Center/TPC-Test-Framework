@@ -475,6 +475,10 @@ def config_cjc(args):
         if not os.getenv('CANGJIE_STDX_PATH'):
             os.environ['CANGJIE_STDX_PATH'] = os.environ['CANGJIE_HOME']
         cfgs.LOG.info("The CJC compiler has been configured.")
+    try:
+        cfgs.CANGJIE_HOME = os.path.dirname(os.path.dirname(shutil.which("cjc")))
+    except:
+        cfgs.LOG.warn("默认配置和用户都未设置仓颉环境, 请检查")
     out = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
     cfgs.LOG.info(out)
     cfgs.BASE_CJC_VERSION = out.split('Cangjie Compiler: ')[1].split(' (')[0]
@@ -1281,7 +1285,7 @@ def runAll(args, cfgs):
     if cfgs.CANGJIE_STDX_PATH:
         cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
         cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
-        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs, args)
     __improt_libs(find_cangjie_lib_arr, cfgs)
     loop_dir(args, cfgs, lambda file: runOne(args, file, subcmd, cfgs))
 
@@ -1427,7 +1431,7 @@ def __improt_libs(libsdir, cfgs=None, is_recursion=True):
     return str
 
 
-def __improt_stdx_libs(libsdir, cfgs=None, is_recursion=True):
+def __improt_stdx_libs(libsdir, cfgs=None, args=None, is_recursion=True):
     LLT_Link_libs = set()
     for sub_lib in libsdir:
         if is_recursion:
@@ -1455,7 +1459,10 @@ def __improt_stdx_libs(libsdir, cfgs=None, is_recursion=True):
                 cfgs.LIBRARY_PRIORITY.append(ss)
         LLT_Link_libs = cfgs.LIBRARY_PRIORITY
     for ss in LLT_Link_libs:
-        if "stdx.fuzz.fuzz" not in ss:
+        if not args.fuzz:
+            if "stdx.fuzz.fuzz" not in ss:
+                cfgs.LIBRARY += "-l {} ".format(ss)
+        else:
             cfgs.LIBRARY += "-l {} ".format(ss)
 
 
@@ -2099,12 +2106,12 @@ def HLTtest(args, cfgs):
     if cfgs.CANGJIE_STDX_PATH:
         cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
         cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
-        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
-    if cfgs.BUILD_TYPE == "ci_test" and os.path.exists(
-            os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")):
-        fuzz_lib = os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")
-    if cp.get("test", "fuzz_lib") != "":
-        fuzz_lib = cp.get("test", "fuzz_lib")
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs, args)
+    # if cfgs.BUILD_TYPE == "ci_test" and os.path.exists(
+    #         os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")):
+    #     fuzz_lib = os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")
+    # if cp.get("test", "fuzz_lib") != "":
+    #     fuzz_lib = cp.get("test", "fuzz_lib")
     _3rd_party_root = get_cjtest_path(args, cfgs, "")
     if _3rd_party_root == "":
         _3rd_party_root = Path(cfgs.HOME_DIR).parent
@@ -2131,8 +2138,8 @@ def HLTtest(args, cfgs):
         os.environ['cjHeapSize'] = cp.get("test", "cjHeapSize")
         compile_options += ""
     elif args.fuzz:
-        os.environ["CANGJIE_PATH"] = f"{fuzz_lib}:{os.getenv('CANGJIE_PATH')}"
-        compile_options += f'--link-options="--whole-archive {fuzz_lib} -no-whole-archive -lstdc++ -lpthread" --sanitizer-coverage-inline-8bit-counters'
+        # os.environ["CANGJIE_PATH"] = f"{fuzz_lib}:{os.getenv('CANGJIE_PATH')}"
+        compile_options += f'--link-options="--whole-archive {cfgs.CANGJIE_HOME}/lib/linux_x86_64_llvm/libclang_rt.fuzzer_no_main.a -no-whole-archive -lstdc++" --sanitizer-coverage-trace-compares --sanitizer-coverage-pc-table --sanitizer-coverage-inline-8bit-counters'
         fuzz_runs = cp.get("test", "fuzz_runs")
         fuzz_rss_limit_mb = cp.get("test", "fuzz_rss_limit_mb")
         if fuzz_runs:
@@ -2192,7 +2199,7 @@ def HLTtest(args, cfgs):
     if cfgs.CANGJIE_STDX_PATH:
         cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
         cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
-        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs)
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs, args)
     __improt_libs(find_cangjie_lib_arr, cfgs)
 
     for root, _, files in os.walk(dirs):

@@ -75,6 +75,7 @@ class ArgConfig:
     OHOS_VERSION = None
     CANGJIE_TARGET = None
     CANGJIE_STDX_PATH = None
+    CANGJIE_HOME = None
     cj_home = None
     BASE_CJC_VERSION = "0.0.0"
     UPDATE_CJPM_TOML = False
