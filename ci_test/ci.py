@@ -52,13 +52,42 @@ def add_hlt_common_arguments(cjtest_parser):
     cjtest_parser_optimize.add_argument("--coverage", action='store_true', help="HLT用例测试方式")
     cjtest_parser_path = cjtest_parser.add_mutually_exclusive_group()
     cjtest_parser_path.add_argument("--case", help="HLT用例测试方式")
-    cjtest_parser_path.add_argument("-p", help="HLT用例测试方式")
+    cjtest_parser_path.add_argument("-p", "--path", help="HLT用例测试方式")
     cjtest_parser.add_argument("--root", help="HLT用例测试方式")
     cjtest_parser_branch = cjtest_parser.add_mutually_exclusive_group()
     cjtest_parser_branch.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
     cjtest_parser_branch.add_argument("--main", action='store_true', help="HLT用例测试方式")
     cjtest_parser_branch.add_argument("--fuzz", action='store_true', help="HLT用例测试方式")
 
+
+def __set_args_default_attribute(args, attr: str):
+    if not hasattr(args, attr):
+        setattr(args, attr, None)
+
+
+def set_args_default_attribute(args):
+    __set_args_default_attribute(args, "coverage")
+    __set_args_default_attribute(args, "case")
+    __set_args_default_attribute(args, "root")
+    __set_args_default_attribute(args, "p")
+    __set_args_default_attribute(args, "path")
+    __set_args_default_attribute(args, "clean")
+    __set_args_default_attribute(args, "main")
+    __set_args_default_attribute(args, "fuzz")
+    __set_args_default_attribute(args, "html")
+    __set_args_default_attribute(args, "b")
+    __set_args_default_attribute(args, "LLT")
+    __set_args_default_attribute(args, "HLT")
+    __set_args_default_attribute(args, "cangjie")
+    __set_args_default_attribute(args, "cj_home")
+    __set_args_default_attribute(args, "target")
+    __set_args_default_attribute(args, "full")
+    __set_args_default_attribute(args, "f")
+    __set_args_default_attribute(args, "stdx_home")
+    __set_args_default_attribute(args, "json")
+    __set_args_default_attribute(args, "csv")
+    __set_args_default_attribute(args, "update_stdx")
+    __set_args_default_attribute(args, "update_toml")
 
 
 def parse_args(cfgs):
@@ -137,14 +166,14 @@ def parse_args(cfgs):
     fuzz_parser.add_argument("--root")
     fuzz_parser.add_argument("--case")
     fuzz_parser.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
-    fuzz_parser.add_argument("-p")
+    fuzz_parser.add_argument("-p", "--path")
 
     bench_parser = sub_parser.add_parser("bench", help="性能用例测试方式, 会寻找test/bench文件夹是否存在性能用例")
     bench_parser.set_defaults(func=bench_mark)
     bench_parser.add_argument("--root", help="")
     bench_parser.add_argument("--case", help="")
     bench_parser.add_argument("--clean", action='store_true', help="是否清空测试临时目录")
-    bench_parser.add_argument("-p", help="")
+    bench_parser.add_argument("-p", "--path", help="")
 
     ## 计算 DT个数方法
     count_parser = sub_parser.add_parser("count", help="默认会统计LLT和HLT总计的用例数")
@@ -176,6 +205,7 @@ def perf_test(args):
 
 
 def bench_mark(args):
+    set_args_default_attribute(args)
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if args.root:
         set_cjtest_path(args, cfgs, '3rd_party_root')
@@ -231,6 +261,7 @@ def cjlint_check(args):
 
 
 def fuzz_test(args):
+    set_args_default_attribute(args)
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if args.root:
         set_cjtest_path(args, cfgs, '3rd_party_root')
@@ -298,6 +329,7 @@ def clean(cfgs):
 
 
 def coverage(args):
+    set_args_default_attribute(args)
     cfgs = args.CANGJIE_CI_TEST_CFGS
     args.e = None
     args.coverage = True
@@ -318,6 +350,7 @@ def coverage(args):
 
 
 def cangjie_doc(args):
+    set_args_default_attribute(args)
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if platform.system() == 'Windows':
         cfgs.LOG.error("暂时不支持windows版本..")
@@ -335,6 +368,7 @@ def cangjie_doc(args):
 
 
 def build(args):
+    set_args_default_attribute(args)
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if args.full:
         cfgs.LOG.info(f"清理build构建目录: {os.path.join(cfgs.HOME_DIR, cfgs.BUILD_BIN)}")
@@ -343,6 +377,7 @@ def build(args):
 
 
 def test(args):
+    set_args_default_attribute(args)
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if args.path and args.case:
         cfgs.LOG.error("单跑用例和单跑指定文件夹, 不能同时设置. ")
