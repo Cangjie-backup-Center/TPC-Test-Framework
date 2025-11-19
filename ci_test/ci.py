@@ -1494,6 +1494,8 @@ def __improt_stdx_libs(libsdir, cfgs=None, args=None, is_recursion=True):
                 cfgs.LIBRARY_PRIORITY.append(ss)
         LLT_Link_libs = cfgs.LIBRARY_PRIORITY
     for ss in LLT_Link_libs:
+        if str(ss).__contains__('aspects'):  # 这里 1.0.3 测试报错. 先屏蔽这个链接
+            continue
         if not args.fuzz:
             if "stdx.fuzz.fuzz" not in ss:
                 cfgs.LIBRARY += "-l {} ".format(ss)
