@@ -2215,10 +2215,10 @@ def HLTtest(args, cfgs):
         _3rd_party_root = get_cjtest_path(args, cfgs, args.target)
     elif args.main:
         os.environ['cjHeapSize'] = cp.get("test", "cjHeapSize")
-        compile_options.replace("--test", '')
+        compile_options = compile_options.replace("--test", '')
     elif args.fuzz:
         # os.environ["CANGJIE_PATH"] = f"{fuzz_lib}:{os.getenv('CANGJIE_PATH')}"
-        compile_options.replace("--test", '')
+        compile_options = compile_options.replace("--test", '')
         compile_options += f' --link-options="--whole-archive {cfgs.CANGJIE_HOME}/lib/linux_x86_64_llvm/libclang_rt.fuzzer_no_main.a -no-whole-archive -lstdc++" --sanitizer-coverage-trace-compares --sanitizer-coverage-pc-table --sanitizer-coverage-inline-8bit-counters'
         fuzz_runs = cp.get("test", "fuzz_runs")
         fuzz_rss_limit_mb = cp.get("test", "fuzz_rss_limit_mb")
