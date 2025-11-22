@@ -268,7 +268,6 @@ def fuzz_test(args):
     if get_cjtest_path(args, cfgs, "") == "":
         cfgs.LOG.error("请设置 --root=${project} 再试.")
         exit(1)
-    args.p = args.target = args.main = None
     args.fuzz = True
     args.optimize = '-O0'
     HLTtest(args, cfgs)
@@ -336,7 +335,6 @@ def coverage(args):
     args.clean = False
     args.target = args.ohos_home = args.cj_home = args.case = args.ut = args.path = args.O2 = args.O1 = args.O0 = args.full = None
     if not args.html:
-        args.root = args.main = args.p = args.fuzz = args.target = None
         build(args)
         if args.LLT:
             test(args)
@@ -2164,8 +2162,8 @@ def HLTtest(args, cfgs):
     run_options = cp.get("test", "run_options")
     compile_options = cp.get("test", "compile_options")
     target = "x86"
-    if args.p:
-        dirs = os.path.join(cfgs.HOME_DIR, args.p)
+    if args.path:
+        dirs = os.path.join(cfgs.HOME_DIR, args.path)
     else:
         dirs = os.path.join(cfgs.HOME_DIR, cfgs.CJ_TEST_WORK, test_dir)
     if args.target:
@@ -2188,9 +2186,9 @@ def HLTtest(args, cfgs):
         else:
             args.fuzz_rss_limit_mb = 4096
         fuzz_dir = os.path.join(cfgs.HOME_DIR, cfgs.CJ_TEST_WORK, "fuzz")
-        if args.p and str(args.p).startswith(str(fuzz_dir)) and os.path.exists(args.p):
-            cfgs.LOG.info(f"指定测试路径：{args.p}")
-            dirs = args.p
+        if args.path and str(args.path).startswith(str(fuzz_dir)) and os.path.exists(args.path):
+            cfgs.LOG.info(f"指定测试路径：{args.path}")
+            dirs = args.path
         else:
             if os.path.exists(fuzz_dir):
                 dirs = fuzz_dir
