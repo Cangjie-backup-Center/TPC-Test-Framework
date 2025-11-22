@@ -3,24 +3,26 @@
 
 import csv
 import glob
-from logging import handlers
+import zipfile
 import argparse
 import configparser
 import json
 import logging
-from logging.handlers import TimedRotatingFileHandler
 import os
 import re
 import platform
 import shutil
 import subprocess
-from subprocess import PIPE
 import sys
+import urllib.request
+import urllib.error
+from subprocess import PIPE
 from pathlib import Path
-import xml.etree.cElementTree as Et
 from xml.dom import minidom
-# from toml import load, dump as dump_ci
 from tomlkit import parse, dump as dump_c
+from logging import handlers
+from logging.handlers import TimedRotatingFileHandler
+import xml.etree.cElementTree as Et
 
 dynamic_lib = ".dll" if platform.system() == "Windows" else ".so"
 static_lib = ".lib" if platform.system() == "Windows" else ".a"
@@ -467,6 +469,51 @@ def __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, that_lib_path):
     return 'lib'
 
 
+# 下载stdx 文件
+def download_large_with_urllib(url, save_path, chunk_size=1024 * 1024):
+    try:
+        with urllib.request.urlopen(url, timeout=10) as response:
+            # 获取文件总大小
+            total_size = int(response.headers.get('Content-Length', 0))
+
+            with open(save_path, 'wb') as f:
+                downloaded_size = 0
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break  # 下载完成
+                    f.write(chunk)
+                    downloaded_size += len(chunk)
+                    # 显示进度
+                    progress = (downloaded_size / total_size) * 100 if total_size > 0 else 0
+                    print(f"\r下载进度：{downloaded_size}/{total_size} bytes ({progress:.2f}%)", end="")
+
+        print(f"\n下载成功！文件保存到：{save_path}")
+    except urllib.error.URLError as e:
+        print(f"\n下载失败：{e}")
+
+# 解压stdx 文件
+def unzip_file(zip_path, extract_dir):
+    """
+    解压 ZIP 文件（无密码）
+    :param zip_path: ZIP 文件路径
+    :param extract_dir: 解压目标目录
+    """
+    try:
+        # 确保目标目录存在
+        os.makedirs(extract_dir, exist_ok=True)
+
+        # 打开 ZIP 文件
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # 解压所有文件到目标目录
+            zip_ref.extractall(extract_dir)
+            print(f"解压成功！文件已提取到：{extract_dir}")
+    except zipfile.BadZipFile:
+        print(f"解压失败：{zip_path} 不是有效的 ZIP 文件")
+    except Exception as e:
+        print(f"解压失败：{e}")
+
+
 def config_cjc(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     master_cjc = shutil.which("cjc")
@@ -480,6 +527,7 @@ def config_cjc(args):
                 for key, value in parm['package'].items():
                     if key == "cjc-version":
                         cfgs.EXPECT_CJC_VERSION = value
+                        break
         else:
             parm = json.load(open(cfg, 'r', encoding='UTF-8'))
             cfgs.EXPECT_CJC_VERSION = parm['cjc_version']
@@ -554,17 +602,18 @@ def config_cjc(args):
                     targ = "stdx"
 
                 if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                    if args.update_stdx:
+                    if hasattr(args, 'update_stdx') and args.update_stdx:
                         cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx: " + cfgs.get_stdx_url())
-                        output = subprocess.Popen(f"wget -q '{cfgs.get_stdx_url()}' --no-check-certificate -O stdx.zip >/dev/null 2>&1",
-                                         shell=True, cwd=os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-                        output.communicate()
-                        output = subprocess.Popen("unzip stdx.zip && rm stdx.zip",
-                                         shell=True, cwd=os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION), stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-                        output.communicate()
+                        if not os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
+                            download_large_with_urllib(cfgs.get_stdx_url(), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'))
+                        if os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
+                            unzip_file(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION))
+                        else:
+                            cfgs.LOG.warn(f"stdx.zip不存在, 下载失败: {os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')}")
+                            exit(1)
                     if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                        cfgs.LOG.info("stdx路径不存在: " + os.path.join(Path(master_cjc).parent.parent, targ))
-                        exit(1)
+                        cfgs.LOG.warn("stdx路径不存在: " + os.path.join(Path(master_cjc).parent.parent, targ))
+                        # exit(1)
                 cfgs.CANGJIE_STDX_PATH = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
             __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_PATH)
         else:
@@ -1709,7 +1758,7 @@ error_list = []
 
 def get_cmd_info(file_name, target, cfgs):
     macro_cmd = ""
-    dependence = ""
+    dependence = []
 
     run_option = ""
     is_valid_case = False
@@ -1737,17 +1786,12 @@ def get_cmd_info(file_name, target, cfgs):
                         macro_cmd += f"{lib} "
                 elif "dependence:" in line:
                     is_valid_case = True
-                    dependence += " " + line[line.index("dependence:") + 11:].replace("\n", "").strip()
-                    dependence = dependence.replace(":", " ").strip()
+                    temp = " " + line[line.index("dependence:") + 11:].replace("\n", "").strip()
+                    temp = temp.replace(":", " ").strip()
                     if case_dir != "":
-                        if len(dependence.split(" ")) > 1:
-                            tdep = ''
-                            for dep in dependence.split(" "):
-                                if dep:
-                                    tdep += f' {os.path.join(case_dir, dep)} '
-                            dependence = tdep
-                        else:
-                            dependence = f"{case_dir}/" + dependence
+                        for dep in temp.split(" "):
+                            if dep:
+                                dependence.append(os.path.join(case_dir, dep.replace('./', '')))
                 elif "data_file:" in line:
                     is_valid_case = True
                     line = line.replace("\n", "").replace(" ", "")
@@ -1756,9 +1800,9 @@ def get_cmd_info(file_name, target, cfgs):
                     if target != "ohos":
                         for data in data_file_str.split(":"):
                             src = os.path.join(os.path.dirname(file_name), data)
-                            dst = os.path.join(os.path.join(cfgs.HOME_DIR, cfgs.CJ_TEST_WORK, "tmp",
-                                                            os.path.dirname(file_name).replace(cfgs.HOME_DIR,
-                                                                                               ".")), data)
+                            dst = os.path.join(cfgs.HOME_DIR, cfgs.CJ_TEST_WORK, "tmp",
+                                            os.path.dirname(file_name).replace(cfgs.HOME_DIR,
+                                                                               "."), data)
                             os.makedirs(os.path.dirname(dst), exist_ok=True)
                             logger.info(f"copy {src} to {dst}")
                             if os.path.isdir(src):
@@ -1816,7 +1860,7 @@ def get_cmd_info(file_name, target, cfgs):
 
     macro_cmd = f"--macro-lib=\"{macro_cmd}\"" if macro_cmd != "" else ""
 
-    return run_option, dependence, macro_cmd, is_valid_case
+    return run_option, " ".join(dependence), macro_cmd, is_valid_case
 
 
 def run_one_case(args, file_path, run_option, compile_option, target, cfgs):
