@@ -14,6 +14,8 @@ import platform
 import shutil
 import subprocess
 import sys
+import threading
+import time
 import urllib.request
 import urllib.error
 from subprocess import PIPE
@@ -439,6 +441,7 @@ def __find_cjpm_home_librarys(args, cfgs):
                 __get_windows_c_lib_arr(cfgs, sub_lib)
         cfgs.IMPORT_PATH += sss
     except:
+        cfgs.LOG.error(f"函数__find_cjpm_home_librarys，遇到异常错误")
         pass
 
 
@@ -461,7 +464,7 @@ def __get_cjpm_library_cjpm_lock_foreign_requires_path(cfgs, that_lib_path):
                                 return str(v).replace('./', '').replace('/', os.path.sep)
     else:
         # json
-        parm = json.load(open(os.patn.join(that_lib_path, "module.json"), 'r', encoding='UTF-8'))
+        parm = json.load(open(os.path.join(that_lib_path, "module.json"), 'r', encoding='UTF-8'))
         for ke, val in parm["foreign_requires"].items():
             for k, v in val.items():
                 if k == 'path':
@@ -537,7 +540,14 @@ def config_cjc(args):
     cfgs.BUILD_CJPM_PATH = get_cangjie_path(cfgs, 'cjpm')
     if cfgs.BUILD_CJPM_PATH == '':
         if cfgs.OS_PLATFORM == "windows":
-            cfgs.BUILD_CJPM_PATH = str(os.path.join(os.getenv("LOCALAPPDATA"), '.cjpm', 'git'))
+            cjpm_path = str(os.path.join(os.path.dirname(os.path.dirname(os.getenv("LOCALAPPDATA"))), '.cjpm', 'git'))
+            if os.path.exists(cjpm_path):
+                cfgs.BUILD_CJPM_PATH = cjpm_path
+            cjpm_path = str(os.path.join(os.getenv("LOCALAPPDATA"), '.cjpm', 'git'))
+            if os.path.exists(cjpm_path):
+                cfgs.BUILD_CJPM_PATH = cjpm_path
+            if cfgs.BUILD_CJPM_PATH == '':
+                cfgs.LOG.error('未找到cjpm的源码目录, 请检查')
         else:
             cfgs.BUILD_CJPM_PATH = str(os.path.join(os.getenv("HOME"), '.cjpm', 'git'))
     if not master_cjc:
@@ -545,11 +555,11 @@ def config_cjc(args):
             set_cangjie_path(args, cfgs)
         except:
             pass
-        cfgs.cj_home = get_cangjie_path(cfgs, 'home')
-        if not cfgs.cj_home:
-            cfgs.LOG.error("No Cangjie path set.")
+        args.cj_home = os.environ.get('CANGJIE_ROOT', get_cangjie_path(cfgs, 'home'))
+        if not args.cj_home:
+            cfgs.LOG.warn("No Cangjie path set.")
         else:
-            args.cj_home = cfgs.cj_home
+            cfgs.cj_home = args.cj_home
         envsetup(args, cfgs)
         cfgs.LOG.info("There is no CJC compiler, configuring the default CJC compiler.")
     else:
@@ -756,8 +766,8 @@ def get_cjc_cpm(cfgs):
 
 def cjpmbuild(args, cfgs):
     output = __do_cjpm_build(args, cfgs)
-    out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
-    set_build_log_warnings_count(cfgs, err)
+    out, err = __log_output(output, output.args, cfgs, cfgs.HOME_DIR)
+    # set_build_log_warnings_count(cfgs, err)
     if "imports package 'stdx" in str(err):
         cfgs.LOG.info("Trying again using STDX package.")
         if cfgs.CANGJIE_STDX_PATH:
@@ -781,9 +791,9 @@ def cjpmbuild(args, cfgs):
                     cfgs.LOG.info("正在将stdx环境写入cjpm.toml")
                     dump_c(ci_test_cfg, toml_f)
             output = __do_cjpm_build(args, cfgs)
-            out, err = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
-            set_build_log_warnings_count(cfgs, err)
-            if output.returncode != 0 or (err and "build failed" in str(err)):
+            out, err = __log_output(output, output.args, cfgs, cfgs.HOME_DIR)
+            # set_build_log_warnings_count(cfgs, err)
+            if output.returncode != 0:
                 cfgs.LOG.error(str(out))
                 cfgs.LOG.error("cjpm build error..")
                 exit(output.returncode)
@@ -799,7 +809,7 @@ def __do_cjpm_build(args, cfgs):
     if args.full:
         cmd0 = "{} update".format(get_cjc_cpm(cfgs))
         output = subprocess.Popen(cmd0, shell=True, cwd=cfgs.HOME_DIR, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-        _, err_log = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
+        _, err_log = __log_output(output, output.args, cfgs, cfgs.HOME_DIR)
         if output.returncode != 0:
             if str(err_log).__contains__("can not find the library"):
                 sub_librarys = []
@@ -811,7 +821,7 @@ def __do_cjpm_build(args, cfgs):
                 __loop_down_load_cjpm_librarys(cfgs, sub_librarys)
                 output = subprocess.Popen(cmd0, shell=True, cwd=cfgs.HOME_DIR, stderr=subprocess.PIPE,
                                           stdout=subprocess.PIPE)
-                _, err_log = log_output(output, output.args, cfgs, cfgs.HOME_DIR)
+                _, err_log = __log_output(output, output.args, cfgs, cfgs.HOME_DIR)
             else:
                 cfgs.LOG.error("build fail")
         cmd1 = "{} build".format(get_cjc_cpm(cfgs))
@@ -1325,10 +1335,45 @@ COUNT_CURRENT_CASE = 0
 error_set = set()
 
 
-def log_output(output, cmd, cfgs, filename=None):
+class ProcessLogger(threading.Thread):
+    def __init__(self, stream, logger, prefix=""):
+        super().__init__(daemon=True)
+        self.stream = stream
+        self.logger = logger
+        self.prefix = prefix
+        self._stop_event = threading.Event()
+        self.daemon = True  # 设为守护线程，主进程退出时自动终止
+
+    def run(self):
+        try:
+            # 读取流时捕获可能的异常
+            while not self._stop_event.is_set():
+                if self.stream.closed:
+                    break
+                line = self.stream.readline()
+                if not line:
+                    time.sleep(0.1)
+                    continue
+                self.logger.info(line.decode('UTF-8', 'ignore').strip())
+        except ValueError as e:
+            if "info->buf must not be NULL" in str(e):
+                pass
+            else:
+                raise
+        except Exception as e:
+            print(f"读取流时发生错误: {e}")
+        finally:
+            # 确保流被关闭
+            if not self.stream.closed:
+                self.stream.close()
+
+    def stop(self):
+        self._stop_event.set()
+
+
+def __log_output(output, cmd, cfgs, filename=None):
     """ log command output"""
     cfgs.LOG.info("CMD    : %s", str(cmd))
-    # cfgs.LOG.info("FILE   : %s", str(filename))
     stdout, stderr = output.communicate()
     encode = cfgs.ENCODING
     error = stderr.decode(encode, "ignore").strip()
@@ -1344,6 +1389,27 @@ def log_output(output, cmd, cfgs, filename=None):
         for item in re.split("\r?\n", out):
             cfgs.LOG.info(re.sub(r"\x1b\[\d+m", "", item))
     return out, error
+
+
+def log_output(proc, cmd, cfgs, filename=None):
+    """ log command output"""
+    cfgs.LOG.info("CMD    : %s", str(cmd))
+    stdout_logger = ProcessLogger(proc.stdout, cfgs.LOG, "")
+    stderr_logger = ProcessLogger(proc.stderr, cfgs.LOG, "")
+    stdout_logger.start()
+    stderr_logger.start()
+    try:
+        while proc.poll() is None:
+            time.sleep(0.5)
+        proc.wait()
+
+        stdout, stderr = proc.communicate()
+        return stdout.decode(cfgs.ENCODING, "ignore").strip(), stderr.decode(cfgs.ENCODING, "ignore").strip()
+    finally:
+        stdout_logger.stop()
+        stderr_logger.stop()
+        stdout_logger.join()
+        stderr_logger.join()
 
 
 def runAll(args, cfgs):
