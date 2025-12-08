@@ -563,8 +563,8 @@ def config_cjc(args):
         envsetup(args, cfgs)
         cfgs.LOG.info("There is no CJC compiler, configuring the default CJC compiler.")
     else:
-        if not os.getenv('CANGJIE_STDX_PATH'):
-            os.environ['CANGJIE_STDX_PATH'] = os.environ['CANGJIE_HOME']
+        if not os.getenv('CANGJIE_STDX_DIR'):
+            os.environ['CANGJIE_STDX_DIR'] = os.environ['CANGJIE_HOME']
         cfgs.LOG.info("The CJC compiler has been configured.")
     try:
         cfgs.CANGJIE_HOME = os.path.dirname(os.path.dirname(shutil.which("cjc")))
@@ -585,7 +585,7 @@ def config_cjc(args):
         cfgs.set_build_bin("target")
         cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
     # config stdx for 0.60.*
-    if not cfgs.CANGJIE_STDX_PATH:
+    if not cfgs.CANGJIE_STDX_DIR:
         if h_cjc_version >= 0.60:
             cfgs.LOG.info("仓颉版本大于0.60.*, 需要检查stdx是否配置")
             if master_cjc:
@@ -593,39 +593,35 @@ def config_cjc(args):
             else:
                 master_cjc = shutil.which("cjc")
                 cfgs.LOG.info("未配置仓颉环境, 正在配置指定的路径的stdx")
-            if os.path.exists(os.path.join(Path(master_cjc).parent.parent, "stdx")):
-                cfgs.CANGJIE_STDX_PATH = os.path.join(Path(master_cjc).parent.parent, "stdx", "dynamic", "stdx")
+            if cfgs.CANGJIE_TARGET == "aarch64-linux-ohos":
+                targ = "linux_ohos_aarch64_llvm"
+            elif cfgs.CANGJIE_TARGET == "x86_64-linux-ohos":
+                targ = "linux_ohos_x86_64_llvm"
+            elif cfgs.CANGJIE_TARGET == "x86_64-unknown-linux-gnu":
+                targ = "linux_x86_64_llvm"
+            elif "windows" in cfgs.CANGJIE_TARGET:
+                targ = "windows_x86_64_llvm"
+            elif "mingw32" in cfgs.CANGJIE_TARGET:
+                targ = "windows_x86_64_llvm"
+            elif "aarch64" in cfgs.CANGJIE_TARGET:
+                targ = "linux_aarch64_llvm"
             else:
-                if cfgs.CANGJIE_TARGET == "aarch64-linux-ohos":
-                    targ = "linux_ohos_aarch64_llvm"
-                elif cfgs.CANGJIE_TARGET == "x86_64-linux-ohos":
-                    targ = "linux_ohos_x86_64_llvm"
-                elif cfgs.CANGJIE_TARGET == "x86_64-unknown-linux-gnu":
-                    targ = "linux_x86_64_llvm"
-                elif "windows" in cfgs.CANGJIE_TARGET:
-                    targ = "windows_x86_64_llvm"
-                elif "mingw32" in cfgs.CANGJIE_TARGET:
-                    targ = "windows_x86_64_llvm"
-                elif "aarch64" in cfgs.CANGJIE_TARGET:
-                    targ = "linux_aarch64_llvm"
-                else:
-                    targ = "stdx"
-
+                targ = "stdx"
+            if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
+                if hasattr(args, 'update_stdx') and args.update_stdx:
+                    cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx: " + cfgs.get_stdx_url())
+                    if not os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
+                        download_large_with_urllib(cfgs.get_stdx_url(), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'))
+                    if os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
+                        unzip_file(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION))
+                    else:
+                        cfgs.LOG.warn(f"stdx.zip不存在, 下载失败: {os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')}")
+                        exit(1)
                 if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                    if hasattr(args, 'update_stdx') and args.update_stdx:
-                        cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx: " + cfgs.get_stdx_url())
-                        if not os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
-                            download_large_with_urllib(cfgs.get_stdx_url(), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'))
-                        if os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
-                            unzip_file(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION))
-                        else:
-                            cfgs.LOG.warn(f"stdx.zip不存在, 下载失败: {os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')}")
-                            exit(1)
-                    if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                        cfgs.LOG.warn("stdx路径不存在: " + os.path.join(Path(master_cjc).parent.parent, targ))
-                        # exit(1)
-                cfgs.CANGJIE_STDX_PATH = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
-            __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_PATH)
+                    cfgs.LOG.warn("stdx路径不存在: " + os.path.join(Path(master_cjc).parent.parent, targ))
+                    # exit(1)
+            cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
+            __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_DIR)
         else:
             cfgs.LOG.info("仓颉版本小于0.60.*")
 
@@ -770,8 +766,8 @@ def cjpmbuild(args, cfgs):
     # set_build_log_warnings_count(cfgs, err)
     if "imports package 'stdx" in str(err):
         cfgs.LOG.info("Trying again using STDX package.")
-        if cfgs.CANGJIE_STDX_PATH:
-            stdx_lib = cfgs.CANGJIE_STDX_PATH
+        if cfgs.CANGJIE_STDX_DIR:
+            stdx_lib = cfgs.CANGJIE_STDX_DIR
             ci_test_cfg = cfgs.BUILD_PARMS
             if "target" not in ci_test_cfg:
                 ci_test_cfg['target'] = {}
@@ -992,6 +988,7 @@ def set_cangjie_home(cfgs, cjc_home):
         os.environ['Path'] = f"{cangjie_path}{os.environ['Path']}"
         if not os.getenv('CANGJIE_HOME'):
             os.environ['CANGJIE_HOME'] = f"{cjc_home}"
+        if not os.getenv('CANGJIE_STDX_PATH'):
             os.environ['CANGJIE_STDX_PATH'] = f"{cjc_home}"
     else:
         cfgs.LOG.info("The current environment is linux")
@@ -1430,10 +1427,10 @@ def runAll(args, cfgs):
                 cfgs.LIBRARY_PATH += f" -L {os.path.join(build_lib, build_lib_item)}"
                 find_cangjie_lib_arr.append(os.path.join(build_lib, build_lib_item))
                 cangjie_env_setup(find_cangjie_lib_arr)
-    if cfgs.CANGJIE_STDX_PATH:
-        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
-        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
-        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs, args)
+    if cfgs.CANGJIE_STDX_DIR:
+        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_DIR).parent}"
+        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_DIR}"
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_DIR], cfgs, args)
     __improt_libs(find_cangjie_lib_arr, cfgs)
     loop_dir(args, cfgs, lambda file: runOne(args, file, subcmd, cfgs))
 
@@ -2248,10 +2245,10 @@ def gen_report(args, cfgs):
 def HLTtest(args, cfgs):
     global _3rd_party_root
     global logger
-    if cfgs.CANGJIE_STDX_PATH:
-        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
-        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
-        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs, args)
+    if cfgs.CANGJIE_STDX_DIR:
+        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_DIR).parent}"
+        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_DIR}"
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_DIR], cfgs, args)
     # if cfgs.BUILD_TYPE == "ci_test" and os.path.exists(
     #         os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")):
     #     fuzz_lib = os.path.join(os.path.dirname(cfgs.HOME), "ci_bin", "libclang_rt.fuzzer_no_main.a")
@@ -2342,10 +2339,10 @@ def HLTtest(args, cfgs):
                 cfgs.LIBRARY_PATH += f" -L {os.path.join(build_lib, build_lib_item)}"
                 find_cangjie_lib_arr.append(os.path.join(build_lib, build_lib_item))
                 cangjie_env_setup(find_cangjie_lib_arr)
-    if cfgs.CANGJIE_STDX_PATH:
-        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_PATH).parent}"
-        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_PATH}"
-        __improt_stdx_libs([cfgs.CANGJIE_STDX_PATH], cfgs, args)
+    if cfgs.CANGJIE_STDX_DIR:
+        cfgs.IMPORT_PATH += f" --import-path {Path(cfgs.CANGJIE_STDX_DIR).parent}"
+        cfgs.LIBRARY_PATH += f" -L {cfgs.CANGJIE_STDX_DIR}"
+        __improt_stdx_libs([cfgs.CANGJIE_STDX_DIR], cfgs, args)
     __improt_libs(find_cangjie_lib_arr, cfgs)
 
     for root, _, files in os.walk(dirs):

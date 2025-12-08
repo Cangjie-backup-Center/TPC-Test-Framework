@@ -82,7 +82,7 @@ class ArgConfig:
     OHOS_COMPILE_OPTION = None
     OHOS_VERSION = None
     CANGJIE_TARGET = None
-    CANGJIE_STDX_PATH = None
+    CANGJIE_STDX_DIR = None
     CANGJIE_HOME = None
     cj_home = None
     BASE_CJC_VERSION = "0.0.0"
