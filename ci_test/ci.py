@@ -563,8 +563,8 @@ def config_cjc(args):
         envsetup(args, cfgs)
         cfgs.LOG.info("There is no CJC compiler, configuring the default CJC compiler.")
     else:
-        if not os.getenv('CANGJIE_STDX_DIR'):
-            os.environ['CANGJIE_STDX_DIR'] = os.environ['CANGJIE_HOME']
+        if not os.getenv('CANGJIE_STDX_PATH'):
+            os.environ['CANGJIE_STDX_PATH'] = os.environ['CANGJIE_HOME']
         cfgs.LOG.info("The CJC compiler has been configured.")
     try:
         cfgs.CANGJIE_HOME = os.path.dirname(os.path.dirname(shutil.which("cjc")))
