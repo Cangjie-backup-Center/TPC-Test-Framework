@@ -15,12 +15,15 @@ import shutil
 import subprocess
 import sys
 import threading
+import uuid
 import time
 import urllib.request
+import urllib.parse
 import urllib.error
 from subprocess import PIPE
 from pathlib import Path
 from xml.dom import minidom
+from config import ArgConfig
 from tomlkit import parse, dump as dump_c
 from logging import handlers
 from logging.handlers import TimedRotatingFileHandler
@@ -120,6 +123,16 @@ def parse_args(cfgs):
     build_parser.add_argument("--update-toml", action='store_true', help="更新仓颉toml文件")
     build_parser.add_argument("--update-stdx", action='store_true', help="更新仓颉stdx")
     build_parser.set_defaults(func=build)
+
+    build_parser = sub_parser.add_parser("download", help="下载测试仓库文件")
+    build_parser.add_argument("--owner", type=str, help="仓库所属空间地址")
+    build_parser.add_argument("--repo", type=str, help="仓库名称")
+    build_parser.add_argument("--bench", type=str, help="分支名称")
+    build_parser.add_argument("--depth", type=int, help="克隆深度")
+    build_parser.add_argument("--username", type=str, help="git用户")
+    build_parser.add_argument("--password", type=str, help="git密码")
+    build_parser.add_argument("-f", "--force", action='store_true', help="是否强制覆盖原来文件夹")
+    build_parser.set_defaults(func=download)
 
     add_llt_common_arguments(sub_parser.add_parser("test", help="用于LLT测试命令"))
     add_llt_common_arguments(sub_parser.add_parser("llt", help="用于LLT测试命令"))
@@ -376,6 +389,102 @@ def build(args):
         cfgs.LOG.info(f"清理build构建目录: {os.path.join(cfgs.HOME_DIR, cfgs.BUILD_BIN)}")
         shutil.rmtree(os.path.join(cfgs.HOME_DIR, cfgs.BUILD_BIN), ignore_errors=True)
     runBuild(args, cfgs)
+
+
+def download(args):
+    cfgs = args.CANGJIE_CI_TEST_CFGS
+    if args.owner is None:
+        args.owner = 'Cangjie-TPC'
+    if args.repo is None:
+        args.repo = 'test4tpc'
+    if args.bench is None:
+        args.bench = cfgs.MODULE_NAME
+    if args.depth is None:
+        args.depth = 1
+    if args.username is None and args.password is None:
+        args.username = cfgs.GIT_USERNAME = get_config_value(cfgs.BUILD_CI_TEST_CFG, "git-config", "username")
+        args.password = cfgs.GIT_PASSWORD = get_config_value(cfgs.BUILD_CI_TEST_CFG, "git-config", "password")
+    cfgs.LOG.info(f"owner={args.owner}, repo={args.repo}, bench={args.bench}, bench={args.bench}, depth={args.depth}")
+
+    # 1. 构建Git仓库HTTPS URL（处理账号密码+特殊字符编码）
+    git_host = "gitcode.com"  # 可根据实际场景改为GitLab/Gitee等，或抽成配置
+    # 对用户名/密码做URL编码（避免特殊字符如@、&导致URL错误）
+    encoded_username = urllib.parse.quote(args.username or "", safe="")
+    encoded_password = urllib.parse.quote(args.password or "", safe="")
+
+    if encoded_username and encoded_password:
+        # 带账号密码的HTTPS URL
+        repo_url = f"https://{encoded_username}:{encoded_password}@{git_host}/{args.owner}/{args.repo}.git"
+    else:
+        # 无账号密码（依赖SSH/匿名访问）
+        repo_url = f"https://{git_host}/{args.owner}/{args.repo}.git"
+        cfgs.LOG.warning("未配置Git账号密码，将尝试匿名/SSH方式克隆仓库")
+
+    # 2. 确定克隆目标目录
+    clone_target_dir = str(uuid.uuid4()).replace('-', '')
+    cfgs.LOG.info(f"开始克隆仓库：{os.path.abspath(clone_target_dir)}")
+
+    # 3. 检查目标目录是否已存在
+    if os.path.exists(clone_target_dir):
+        cfgs.LOG.warning(f"目标目录 {clone_target_dir} 已存在，将删除后重新克隆（CI场景建议清理）")
+        # CI环境下直接删除目录（可根据需求改为报错/跳过）
+        try:
+            if sys.platform == "win32":
+                subprocess.run(f"rmdir /s /q {clone_target_dir}", shell=True, check=True)
+            else:
+                subprocess.run(f"rm -rf {clone_target_dir}", shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            cfgs.LOG.error(f"删除已有目录失败：{e}")
+            raise
+
+    # 4. 构建git clone命令（浅克隆+指定目录）
+    clone_cmd = [
+        "git", "clone", "--depth", str(args.depth), repo_url, '-b', args.bench, clone_target_dir  # 克隆到指定目录
+    ]
+    cfgs.LOG.info(f"执行Git命令：{' '.join(clone_cmd).replace(args.password, '****')}")
+
+    # 5. 执行克隆命令（捕获异常并记录日志）
+    try:
+        # 执行命令并捕获输出（stdout/stderr）
+        result = subprocess.run(
+            clone_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            check=True  # 执行失败时抛出CalledProcessError
+        )
+        # 打印克隆成功日志
+        cfgs.LOG.info(f"仓库克隆成功！输出：{result.stdout.strip()}")
+
+    except subprocess.CalledProcessError as e:
+        # 命令执行失败（如仓库不存在、账号密码错误、网络问题）
+        error_msg = f"仓库克隆失败！命令返回码：{e.returncode}，错误信息：{e.stderr.strip()}"
+        cfgs.LOG.error(error_msg)
+        raise Exception(error_msg) from e  # 抛出异常让上层处理
+    except Exception as e:
+        # 其他异常（如权限不足、路径错误）
+        cfgs.LOG.error(f"克隆仓库时发生未知错误：{str(e)}")
+        raise
+    # 5 文件夹 check
+    target_dir = os.path.join(cfgs.HOME_DIR, 'test')
+    if os.path.exists(target_dir):
+        if args.force:
+            cfgs.LOG.info('正在删除test文件夹')
+            shutil.rmtree(os.path.join(cfgs.HOME_DIR, target_dir), ignore_errors=True)
+        else:
+            cfgs.LOG.error(f'{target_dir}文件夹已经存在.')
+            raise Exception(f'{target_dir}文件夹已经存在.')
+    source_dir = os.path.join(cfgs.HOME_DIR, clone_target_dir, 'test')
+    if not os.path.exists(source_dir):
+        raise FileNotFoundError(f"源文件夹不存在：{source_dir}")
+    cfgs.LOG.info(f"source_dir：{source_dir}")
+    cfgs.LOG.info(f"target_dir：{target_dir}")
+    shutil.move(str(source_dir), str(target_dir))  # 部分Python版本需转字符串
+
+    cfgs.LOG.info(f"清理临时：{os.path.join(cfgs.HOME_DIR, clone_target_dir)}")
+    shutil.rmtree(os.path.join(cfgs.HOME_DIR, clone_target_dir), ignore_errors=True)
+    cfgs.LOG.info(f"文件夹已移动到：{target_dir}")
 
 
 def test(args):
@@ -648,7 +757,7 @@ def init_log(cfgs, name):
     return log
 
 
-def parser_maple_test_config_file(cfgs):
+def parser_maple_test_config_file(cfgs: ArgConfig):
     cfg = read_config(complete_path(os.path.join(cfgs.BASE_DIR, "ci_test.cfg")))
     cfgs.temp_dir = complete_path(
         os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "running", "temp_dir", default="../test_temp/run")))

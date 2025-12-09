@@ -87,6 +87,8 @@ class ArgConfig:
     cj_home = None
     BASE_CJC_VERSION = "0.0.0"
     UPDATE_CJPM_TOML = False
+    GIT_USERNAME = None
+    GIT_PASSWORD = None
 
     def __init__(self):
         master_cjc = shutil.which("cjc")
