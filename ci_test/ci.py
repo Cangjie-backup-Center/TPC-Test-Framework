@@ -406,6 +406,11 @@ def download(args):
         args.password = cfgs.GIT_PASSWORD = get_config_value(cfgs.BUILD_CI_TEST_CFG, "git-config", "password")
     cfgs.LOG.info(f"owner={args.owner}, repo={args.repo}, bench={args.bench}, bench={args.bench}, depth={args.depth}")
 
+    target_dir = os.path.join(cfgs.HOME_DIR, 'test')
+    if not args.force and os.path.exists(target_dir):
+        cfgs.LOG.info(f"test目录已存在：{target_dir}")
+        return
+
     # 1. 构建Git仓库HTTPS URL（处理账号密码+特殊字符编码）
     git_host = "gitcode.com"  # 可根据实际场景改为GitLab/Gitee等，或抽成配置
     # 对用户名/密码做URL编码（避免特殊字符如@、&导致URL错误）
@@ -467,7 +472,7 @@ def download(args):
         cfgs.LOG.error(f"克隆仓库时发生未知错误：{str(e)}")
         raise
     # 5 文件夹 check
-    target_dir = os.path.join(cfgs.HOME_DIR, 'test')
+
     if os.path.exists(target_dir):
         if args.force:
             cfgs.LOG.info('正在删除test文件夹')
