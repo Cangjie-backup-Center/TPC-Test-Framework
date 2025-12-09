@@ -483,7 +483,21 @@ def download(args):
     shutil.move(str(source_dir), str(target_dir))  # 部分Python版本需转字符串
 
     cfgs.LOG.info(f"清理临时：{os.path.join(cfgs.HOME_DIR, clone_target_dir)}")
-    shutil.rmtree(os.path.join(cfgs.HOME_DIR, clone_target_dir), ignore_errors=True)
+    delete_path = str(os.path.join(cfgs.HOME_DIR, clone_target_dir))
+    shutil.rmtree(delete_path, ignore_errors=True)
+    if not os.path.exists(delete_path):
+        cfgs.LOG.info(f"临时目录删除成功：{delete_path}")
+    elif cfgs.OS_PLATFORM == 'windows':
+        cmd = f'rmdir /s /q "{delete_path}"'  # 去掉长路径前缀
+        cfgs.LOG.warning(f"Python内置删除失败，尝试系统命令{cmd}删除...")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.returncode == 0:
+            cfgs.LOG.info(f"系统命令删除成功：{delete_path}")
+        else:
+            cfgs.LOG.error(f"系统命令删除失败：{result.stderr}")
+            raise  # 抛出异常终止流程
+    else:
+        cfgs.LOG.warn(f"系统命令删除失败：{result.stderr}, 请手动删除临时目录")
     cfgs.LOG.info(f"文件夹已移动到：{target_dir}")
 
 
