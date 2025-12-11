@@ -1982,7 +1982,7 @@ def get_cmd_info(file_name, target, cfgs):
                     if case_dir != "":
                         for dep in temp.split(" "):
                             if dep:
-                                dependence.append(os.path.join(case_dir, dep.replace('./', '')))
+                                dependence.append(os.path.join(case_dir, dep))
                 elif "data_file:" in line:
                     is_valid_case = True
                     line = line.replace("\n", "").replace(" ", "")
