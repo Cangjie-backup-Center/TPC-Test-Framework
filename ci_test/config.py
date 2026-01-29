@@ -9,6 +9,9 @@ import platform
 import subprocess
 from tomlkit import parse
 
+str_head_1 = [233, 166, 131, 208, 152, 32, 116, 101, 115, 116, 32]
+str_head_2 = [27, 91, 52, 70, 27, 55, 27, 91, 57, 57, 57, 57, 69, 27, 91, 51, 70, 233, 166, 131, 230, 145, 157, 32, 103, 114, 111, 117, 112, 32, 100, 101, 102, 97, 117, 108, 116]
+str_tail_1 = [41, 32, 27, 56, 27, 91, 48, 74, 27, 55, 27, 91, 59, 114, 27, 56] # 尾
 
 class ArgConfig:
     CANGJIE_STDX_DOWNLOAD_MAP = {
@@ -185,9 +188,59 @@ class ArgConfig:
                 for msg in iter(res.stdout.readline, b''):
                     msg = str(msg, encode, errors='ignore').strip()
                     if msg != "":
-                        self.LOG.info(msg)
+                        if check_not_start_or_end_with_target(msg, str_head_1, True) and \
+                                check_not_start_or_end_with_target(msg, str_head_2, True) and \
+                                check_not_start_or_end_with_target(msg, str_tail_1, False):
+                            self.LOG.info(msg)
                 res.kill()
         finally:
             if res.poll():
                 res.kill()
         return res.returncode
+
+
+def llt_check_not_start_or_end_with_target(msg) -> bool:
+    return check_not_start_or_end_with_target(msg, str_head_1, True) and \
+            check_not_start_or_end_with_target(msg, str_head_2, True) and \
+            check_not_start_or_end_with_target(msg, str_tail_1, False)
+
+
+def check_not_start_or_end_with_target(input_data, target_byte_arr, flag, encoding='utf-8'):
+    """
+    纯字节手动对比：判断字符串/字节序列 既不是以目标字节序列开头，也不是以其结尾
+    不使用startswith/endswith，完全手动截取+逐字节比对
+    :param input_data: 待判断的字符串 或 直接传入bytes字节序列
+    :param encoding: 若input_data是字符串，使用该编码转字节（默认utf-8）
+    :return: True（既不是开头也不是结尾）/ False（开头或结尾匹配）
+    """
+    target_bytes = bytes(target_byte_arr)
+
+    # 2. 统一转为bytes字节序列（兼容字符串/bytes输入）
+    if isinstance(input_data, str):
+        try:
+            str_bytes = input_data.encode(encoding)
+        except UnicodeEncodeError as e:
+            print(f"编码错误：{e}")
+            return True  # 编码失败默认视为“不匹配”
+    elif isinstance(input_data, bytes):
+        str_bytes = input_data
+    else:
+        print("输入类型错误，仅支持字符串或bytes")
+        return True
+
+    # ------------------- 手动判断“开头匹配” -------------------
+    if flag:
+        # 截取开头target_len个字节，逐字节对比
+        for n, c in zip(target_bytes, str_bytes):
+            if n != c:
+                return False
+    else:
+        # ------------------- 手动判断“结尾匹配” -------------------
+        # 截取结尾target_len个字节，逐字节对比（计算结尾起始索引：str_len - target_len）
+        for n, c in zip(target_bytes[::-1], str_bytes[::-1]):
+            if n != c:
+                return False
+
+    # 4. 核心逻辑：只要开头/结尾有一个匹配，返回False；否则返回True
+    return True
+

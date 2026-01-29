@@ -23,7 +23,7 @@ import urllib.error
 from subprocess import PIPE
 from pathlib import Path
 from xml.dom import minidom
-from config import ArgConfig
+from config import ArgConfig, llt_check_not_start_or_end_with_target
 from tomlkit import parse, dump as dump_c
 from logging import handlers
 from logging.handlers import TimedRotatingFileHandler
@@ -122,6 +122,9 @@ def parse_args(cfgs):
     build_parser.add_argument("--stdx-home", help="设置仓颉环境路径")
     build_parser.add_argument("--update-toml", action='store_true', help="更新仓颉toml文件")
     build_parser.add_argument("--update-stdx", action='store_true', help="更新仓颉stdx")
+    build_parser.add_argument("--release", action='store_true', help="release模式编译")
+    build_parser.add_argument("--debug", action='store_true', help="debug模式编译")
+    build_parser.add_argument('--verbose', action='store_true', help="--verbose")
     build_parser.set_defaults(func=build)
 
     build_parser = sub_parser.add_parser("download", help="下载测试仓库文件")
@@ -500,7 +503,6 @@ def download(args):
             cfgs.LOG.info(f"系统命令删除成功：{delete_path}")
         else:
             cfgs.LOG.error(f"系统命令删除失败：{result.stderr}")
-            raise  # 抛出异常终止流程
     else:
         cfgs.LOG.warn(f"系统命令删除失败：{result.stderr}, 请手动删除临时目录")
     cfgs.LOG.info(f"文件夹已移动到：{target_dir}")
@@ -568,9 +570,9 @@ def __find_cjpm_home_librarys(args, cfgs):
             if cfgs.OS_PLATFORM == "windows":
                 __get_windows_c_lib_arr(cfgs, sub_lib)
         cfgs.IMPORT_PATH += sss
-    except:
-        cfgs.LOG.error(f"函数__find_cjpm_home_librarys，遇到异常错误")
-        pass
+    except Exception as e:
+        cfgs.LOG.error(f"函数__find_cjpm_home_librarys，遇到异常错误 {e}")
+
 
 
 def __get_windows_c_lib_arr(cfgs, sub_lib):
@@ -777,7 +779,7 @@ def init_log(cfgs, name):
 
 
 def parser_maple_test_config_file(cfgs: ArgConfig):
-    cfg = read_config(complete_path(os.path.join(cfgs.BASE_DIR, "ci_test.cfg")))
+    cfg = read_config(complete_path(os.path.join(cfgs.FILE_ROOT, "ci_test.cfg")))
     cfgs.temp_dir = complete_path(
         os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "running", "temp_dir", default="../test_temp/run")))
     cfgs.log_dir = complete_path(
@@ -953,6 +955,12 @@ def __do_cjpm_build(args, cfgs):
         cmd1 = "{} build -i".format(get_cjc_cpm(cfgs))
     if args.coverage:
         cmd1 += " --coverage"
+    elif args.release:
+        cmd1 += " --release"
+    elif args.debug:
+        cmd1 += " --debug"
+    if args.verbose:
+        cmd1 += " --verbose"
     if args.target and str(args.target).__contains__("ohos"):
         # 读取 DEVECO_CANGJIE_HOME 环境变量
         _get_DEVECO_CANGJIE_HOME(cfgs)
@@ -1479,7 +1487,8 @@ class ProcessLogger(threading.Thread):
                 if not line:
                     time.sleep(0.1)
                     continue
-                self.logger.info(line.decode('UTF-8', 'ignore').strip())
+                if not llt_check_not_start_or_end_with_target(line):
+                    self.logger.info(line.decode('UTF-8', 'ignore').strip())
         except ValueError as e:
             if "info->buf must not be NULL" in str(e):
                 pass
@@ -1525,7 +1534,7 @@ def log_output(proc, cmd, cfgs, filename=None):
     stderr_logger.start()
     try:
         while proc.poll() is None:
-            time.sleep(0.5)
+            time.sleep(0.1)
         proc.wait()
 
         stdout, stderr = proc.communicate()
@@ -2059,7 +2068,6 @@ def run_one_case(args, file_path, run_option, compile_option, target, cfgs):
     global total_count
     global error_list
     logger.setStream(f"{os.path.basename(file_path)}.log")
-    target_cmd = ""
 
     case_run_option, dependence, macro_cmd, is_valid_case = get_cmd_info(file_path, target, cfgs)
     if not is_valid_case:
@@ -2087,7 +2095,7 @@ def run_one_case(args, file_path, run_option, compile_option, target, cfgs):
     out = os.path.join(case_dir, f"{file_name}.out")
     # case_import_cmd = '" --import-path="'
     # case_library_path_L_cmd = " -L "
-    compile_cmd = f'cjc {cfgs.Woff} {args.optimize} {target_cmd} {macro_cmd} ' \
+    compile_cmd = f'cjc {cfgs.Woff} {args.optimize} {macro_cmd} ' \
                   f'{cfgs.IMPORT_PATH} ' \
                   f'{cfgs.LIBRARY_PATH} ' \
                   f'{cfgs.LIBRARY}' \
