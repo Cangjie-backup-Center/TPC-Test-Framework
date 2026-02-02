@@ -188,9 +188,7 @@ class ArgConfig:
                 for msg in iter(res.stdout.readline, b''):
                     msg = str(msg, encode, errors='ignore').strip()
                     if msg != "":
-                        if check_not_start_or_end_with_target(msg, str_head_1, True) and \
-                                check_not_start_or_end_with_target(msg, str_head_2, True) and \
-                                check_not_start_or_end_with_target(msg, str_tail_1, False):
+                        if not llt_check_not_start_or_end_with_target(msg):
                             self.LOG.info(msg)
                 res.kill()
         finally:
