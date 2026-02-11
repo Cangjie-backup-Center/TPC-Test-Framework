@@ -3,6 +3,7 @@
 
 import csv
 import glob
+import pathlib
 import zipfile
 import argparse
 import configparser
@@ -647,6 +648,17 @@ def unzip_file(zip_path, extract_dir):
         print(f"解压失败：{e}")
 
 
+def get_base_version(output: str) -> str:
+    pattern = r'(?<=Cangjie Compiler: )\d+\.\d+\.\d+'
+    match = re.search(pattern, output)
+
+    if match:
+        version = match.group()
+        return version
+    else:
+        print("未找到匹配的版本号")
+
+
 def config_cjc(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
     master_cjc = shutil.which("cjc")
@@ -702,13 +714,9 @@ def config_cjc(args):
         cfgs.LOG.warn("默认配置和用户都未设置仓颉环境, 请检查")
     out = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
     cfgs.LOG.info(out)
-    cfgs.BASE_CJC_VERSION = out.split('Cangjie Compiler: ')[1].split(' (')[0]
-    h_cjc_version_arr = cfgs.BASE_CJC_VERSION.split(".")
+    cfgs.BASE_CJC_VERSION = get_base_version(out)
     cfgs.CANGJIE_TARGET = out.split('Target: ')[1].replace('\n', '').replace('\r', '')
-    h_cjc_version = float(h_cjc_version_arr[0])
-    if float(h_cjc_version_arr[1]) != 0:
-        h_cjc_version += float(f'0.{h_cjc_version_arr[1]}')
-    if h_cjc_version < 0.49:
+    if compare_versions(cfgs.BASE_CJC_VERSION, '0.49.0') < 0:
         cfgs.set_build_bin("build")
         cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
     else:
@@ -716,41 +724,50 @@ def config_cjc(args):
         cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
     # config stdx for 0.60.*
     if not cfgs.CANGJIE_STDX_DIR:
-        if h_cjc_version >= 0.60:
-            cfgs.LOG.info("仓颉版本大于0.60.*, 需要检查stdx是否配置")
+        if compare_versions(cfgs.BASE_CJC_VERSION, '0.61.0') >= 0:
+            cfgs.LOG.info(f"仓颉版本:{cfgs.BASE_CJC_VERSION}, 需要检查stdx是否配置")
             if master_cjc:
                 cfgs.LOG.info("当前环境变量已经设置仓颉, 检查CANGJIE_HOME中是否存在stdx")
             else:
                 master_cjc = shutil.which("cjc")
                 cfgs.LOG.info("未配置仓颉环境, 正在配置指定的路径的stdx")
             if cfgs.CANGJIE_TARGET == "aarch64-linux-ohos":
-                targ = "linux_ohos_aarch64_llvm"
+                targ = f"linux_ohos_aarch64_{cfgs.CJC_RUNTIME_SUFFIX}"
             elif cfgs.CANGJIE_TARGET == "x86_64-linux-ohos":
-                targ = "linux_ohos_x86_64_llvm"
+                targ = f"linux_ohos_x86_64_{cfgs.CJC_RUNTIME_SUFFIX}"
             elif cfgs.CANGJIE_TARGET == "x86_64-unknown-linux-gnu":
-                targ = "linux_x86_64_llvm"
+                targ = f"linux_x86_64_{cfgs.CJC_RUNTIME_SUFFIX}"
             elif "windows" in cfgs.CANGJIE_TARGET:
-                targ = "windows_x86_64_llvm"
+                targ = f"windows_x86_64_{cfgs.CJC_RUNTIME_SUFFIX}"
             elif "mingw32" in cfgs.CANGJIE_TARGET:
-                targ = "windows_x86_64_llvm"
+                targ = f"windows_x86_64_{cfgs.CJC_RUNTIME_SUFFIX}"
             elif "aarch64" in cfgs.CANGJIE_TARGET:
-                targ = "linux_aarch64_llvm"
+                targ = f"linux_aarch64_{cfgs.CJC_RUNTIME_SUFFIX}"
             else:
                 targ = "stdx"
-            if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
+            old_targ = targ.replace("cjnative", 'llvm')
+            if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)) or not os.path.exists(os.path.join(Path(master_cjc).parent.parent, old_targ)):
                 if hasattr(args, 'update_stdx') and args.update_stdx:
                     cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx: " + cfgs.get_stdx_url())
                     if not os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
                         download_large_with_urllib(cfgs.get_stdx_url(), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'))
                     if os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
                         unzip_file(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION))
+                        old_targ = targ.replace("cjnative", 'llvm')
+                        os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, targ)
+                        shutil.copytree(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, targ), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, old_targ))
                     else:
                         cfgs.LOG.warn(f"stdx.zip不存在, 下载失败: {os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')}")
                         exit(1)
                 if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
                     cfgs.LOG.warn("stdx路径不存在: " + os.path.join(Path(master_cjc).parent.parent, targ))
                     # exit(1)
-            cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
+            if os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
+                cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
+            elif os.path.exists(os.path.join(Path(master_cjc).parent.parent, old_targ)):
+                cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, old_targ, "dynamic", "stdx")
+            else:
+                cfgs.LOG.warn("No STDX directory found.")
             __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_DIR)
         else:
             cfgs.LOG.info("仓颉版本小于0.60.*")
@@ -1080,21 +1097,10 @@ def envsetup(args, cfgs):
             cjc_home = os.path.join(args.cj_home, env_cjc)
         else:
             # 使用 默认 最新cjc 版本
-            max_version = 0  # float(str(lists[0]).replace(".", ""))
-            index = 0
-            for li in lists:
-                try:
-                    if len(lists[max_version]) == 6 and len(li) == 6:
-                        if int(str(lists[max_version]).replace(".", "")) < int(str(li).replace(".", "")):
-                            max_version = index
-                    index += 1
-                except:
-                    index += 1
-                    continue
-            if lists[max_version] != "":
-                cjc_home = os.path.join(args.cj_home, lists[max_version])
+            raise AssertionError("暂时不支持自动下载最新版")
             # TODO
-
+        if compare_versions(env_cjc, '1.0.4') > 0:
+            cfgs.CJC_RUNTIME_SUFFIX = 'cjnative'
         set_cangjie_home(cfgs, cjc_home)
         if env_cjc == '':
             cfgs.LOG.error(f"set cjc version fail. cjpm.toml Expected version is {cjc_version}")
@@ -1108,12 +1114,133 @@ def envsetup(args, cfgs):
         return False
 
 
+def compare_versions(v1: str, v2: str) -> int:
+    """
+    比较两个版本号字符串大小（遵循语义化版本规范核心逻辑）
+
+    返回:
+        -1: v1 < v2
+         0: v1 == v2
+         1: v1 > v2
+
+    特性:
+    ✅ 自动清理空格/前导零
+    ✅ 处理不同长度（短版本号自动补0）
+    ✅ 严格校验：拒绝负数、非数字主版本段
+    ✅ 智能 fallback：优先使用 packaging 库（支持预发布/构建元数据），无依赖时启用安全解析
+    ✅ 详细异常提示（便于调试）
+
+    示例:
+        compare_versions("1.0.1", "1.0")      → 1
+        compare_versions("1.10", "1.2")       → 1  (10 > 2)
+        compare_versions("2.0.0-beta", "2.0.0") → -1 (预发布版 < 正式版)
+        compare_versions(" 1.02 ", "1.2.0")   → 0
+    """
+    import re
+    from typing import List, Tuple
+
+    def _sanitize(v: str) -> str:
+        """清理空格，保留关键分隔符"""
+        if not isinstance(v, str):
+            raise TypeError(f"Version must be string, got {type(v).__name__}")
+        v = v.strip()
+        if not v:
+            raise ValueError("Version string cannot be empty")
+        return v
+
+    def _parse_numeric_parts(v: str) -> Tuple[List[int], str]:
+        """
+        解析主版本段（数字部分），分离预发布/构建元数据
+        返回: (数字段列表, 剩余标识符)
+        """
+        # 提取主版本段（直到遇到非数字/点/空格）
+        match = re.match(r'^[\d.]+', v)
+        if not match:
+            raise ValueError(f"Invalid version format: '{v}' (no numeric parts found)")
+
+        num_str = match.group(0)
+        rest = v[len(num_str):].strip()
+
+        # 解析数字段
+        parts = []
+        for seg in num_str.split('.'):
+            seg_clean = seg.strip()
+            if not seg_clean:  # 处理连续点（如 "1..2"）
+                parts.append(0)
+                continue
+            try:
+                num = int(seg_clean)
+                if num < 0:
+                    raise ValueError(f"Negative version segment not allowed: '{seg_clean}'")
+                parts.append(num)
+            except ValueError:
+                raise ValueError(f"Invalid numeric segment: '{seg_clean}' in version '{v}'")
+        return parts, rest
+
+    def _compare_with_packaging(v1: str, v2: str) -> int:
+        """使用 packaging 库进行完整 SemVer 比较（含预发布/构建元数据）"""
+        try:
+            from packaging.version import parse
+            ver1, ver2 = parse(v1), parse(v2)
+            if ver1 < ver2:
+                return -1
+            elif ver1 > ver2:
+                return 1
+            return 0
+        except ImportError:
+            return None  # Fallback to manual parsing
+
+    # ====== 主逻辑 ======
+    v1_clean, v2_clean = _sanitize(v1), _sanitize(v2)
+
+    # 优先尝试使用 packaging 库（最准确）
+    if (res := _compare_with_packaging(v1_clean, v2_clean)) is not None:
+        return res
+
+    # ====== 无依赖 fallback：安全解析数字主干 ======
+    try:
+        nums1, meta1 = _parse_numeric_parts(v1_clean)
+        nums2, meta2 = _parse_numeric_parts(v2_clean)
+
+        # 补齐长度（短版本号视为后续段为0）
+        max_len = max(len(nums1), len(nums2))
+        nums1 += [0] * (max_len - len(nums1))
+        nums2 += [0] * (max_len - len(nums2))
+
+        # 比较数字主干
+        for a, b in zip(nums1, nums2):
+            if a < b:
+                return -1
+            elif a > b:
+                return 1
+
+        # 数字主干相同：有预发布标识的版本 < 无标识的正式版
+        # （简化逻辑：仅判断是否存在标识符，不深入解析 alpha/beta 等）
+        has_meta1 = bool(meta1 and not meta1.startswith('+'))
+        has_meta2 = bool(meta2 and not meta2.startswith('+'))
+
+        if has_meta1 and not has_meta2:
+            return -1
+        elif not has_meta1 and has_meta2:
+            return 1
+        # 其他情况（均有/均无标识符）视为相等
+        return 0
+
+    except Exception as e:
+        # 提供明确错误指引
+        raise ValueError(
+            f"Version comparison failed: {str(e)}\n"
+            f"Tip: For full SemVer support (pre-releases, build metadata), install: pip install packaging"
+        ) from e
+
+
+
 def set_cangjie_home(cfgs, cjc_home):
     if cfgs.OS_PLATFORM == "windows":
         cfgs.LOG.info("The current environment is Windows")
         cangjie_bin = os.path.join(cjc_home, 'bin')
         cangjie_tools = os.path.join(cjc_home, 'tools', 'bin')
-        cangjie_runtime = os.path.join(cjc_home, 'runtime', 'lib', 'windows_x86_64_llvm')
+        cangjie_runtime = os.path.join(cjc_home, 'runtime', 'lib', f'windows_x86_64_{cfgs.CJC_RUNTIME_SUFFIX}')
         cangjie_path = ""
         if cangjie_runtime not in os.environ['Path']:
             cangjie_path += f'{cangjie_runtime};'
@@ -1132,7 +1259,7 @@ def set_cangjie_home(cfgs, cjc_home):
         os.environ['CANGJIE_HOME'] = f"{cjc_home}"
         os.environ['CANGJIE_STDX_PATH'] = f"{cjc_home}"
         os.environ[
-            'LD_LIBRARY_PATH'] = f"{cjc_home}/runtime/lib/linux_x86_64_llvm:{cjc_home}/debugger/third_party/lldb/lib:" + os.environ.get(
+            'LD_LIBRARY_PATH'] = f"{cjc_home}/runtime/lib/linux_x86_64_{cfgs.CJC_RUNTIME_SUFFIX}:{cjc_home}/debugger/third_party/lldb/lib:" + os.environ.get(
             'LD_LIBRARY_PATH', "")
 
 
@@ -1679,29 +1806,57 @@ def runOne(args, file, subcmd, cfgs):
                         RESULT.get("PASS").append(str(path))
 
 
-def __improt_libs(libsdir, cfgs=None, is_recursion=True):
+def __improt_libs(libsdir, cfgs=None):
+    """
+    递归查找指定目录下所有平台的库文件，移除 'lib' 前缀和文件后缀，返回唯一文件名集合
+
+    支持平台：
+      - Linux: .a (静态), .so (动态)
+      - macOS: .a (静态), .dylib (动态)
+      - Windows: .lib (静态), .dll (动态)
+
+    处理逻辑：
+      1. 识别库文件（扩展名匹配）
+      2. 移除文件名开头的 'lib'（不区分大小写）
+      3. 移除文件后缀（如 .a, .so 等）
+      4. 统一转为小写（避免大小写差异）
+
+    示例:
+        "libfoo.a" → "foo"
+        "LIBBAR.SO" → "bar"
+        "foo.dll" → "foo"
+        "baz.dylib" → "baz"
+    """
+    # 定义所有支持的库扩展名（忽略大小写）
+    LIB_EXTENSIONS: set[str] = {'.a', '.so', '.dylib', '.lib', '.dll'}
+    # 递归遍历所有库文件
     LLT_Link_libs = set()
     str = ""
     for sub_lib in libsdir:
-        if is_recursion:
-            for path, _, libs in os.walk(sub_lib):
-                for lib in libs:
-                    if lib.startswith("lib") and lib.endswith(".so"):
-                        LLT_Link_libs.add(lib[3:len(lib) - 3])
-                    elif lib.startswith("lib") and lib.endswith(".a"):
-                        LLT_Link_libs.add(lib[3:len(lib) - 2])
-                    elif platform.system() == 'Windows' and lib.startswith("lib") and lib.endswith(".dll"):
-                        LLT_Link_libs.add(lib[3:len(lib) - 4])
-        else:
-            for so in glob.glob(os.path.join(sub_lib, "lib*.dll")):
-                so = os.path.basename(so)
-                LLT_Link_libs.add(so[3:len(so) - 4])
-            for so in glob.glob(os.path.join(sub_lib, "lib*.so")):
-                so = os.path.basename(so)
-                LLT_Link_libs.add(so[3:len(so) - 3])
-            for so in glob.glob(os.path.join(sub_lib, "lib*.a")):
-                so = os.path.basename(so)
-                LLT_Link_libs.add(so[3:len(so) - 2])
+        # 验证输入目录
+        root_path = pathlib.Path(sub_lib).resolve()
+        if not root_path.exists():
+            raise FileNotFoundError(f"Directory not found: {sub_lib}")
+        if not root_path.is_dir():
+            raise NotADirectoryError(f"Not a directory: {sub_lib}")
+
+        for dirpath, _, filenames in os.walk(root_path):
+            for filename in filenames:
+                # 检查扩展名（忽略大小写）
+                ext = pathlib.Path(filename).suffix.lower()
+                if ext not in LIB_EXTENSIONS:
+                    continue
+
+                # 1. 移除文件后缀
+                base_name = os.path.splitext(filename)[0]
+
+                # 2. 移除开头的 'lib'（不区分大小写）
+                if base_name.lower().startswith('lib'):
+                    base_name = base_name[3:]  # 移除前3个字符 'lib'
+
+                # 3. 统一转为小写（避免大小写差异）
+                LLT_Link_libs.add(base_name)
+
     if cfgs and len(cfgs.LIBRARY_PRIORITY) > 0:
         for ss in LLT_Link_libs:
             if not cfgs.LIBRARY_PRIORITY.__contains__(ss):
@@ -2418,7 +2573,7 @@ def HLTtest(args, cfgs):
     elif args.fuzz:
         # os.environ["CANGJIE_PATH"] = f"{fuzz_lib}:{os.getenv('CANGJIE_PATH')}"
         compile_options = compile_options.replace("--test", '')
-        compile_options += f' --link-options="--whole-archive {cfgs.CANGJIE_HOME}/lib/linux_x86_64_llvm/libclang_rt.fuzzer_no_main.a -no-whole-archive -lstdc++" --sanitizer-coverage-trace-compares --sanitizer-coverage-pc-table --sanitizer-coverage-inline-8bit-counters'
+        compile_options += f' --link-options="--whole-archive {cfgs.CANGJIE_HOME}/lib/linux_x86_64_{cfgs.CJC_RUNTIME_SUFFIX}/libclang_rt.fuzzer_no_main.a -no-whole-archive -lstdc++" --sanitizer-coverage-trace-compares --sanitizer-coverage-pc-table --sanitizer-coverage-inline-8bit-counters'
         fuzz_runs = cp.get("test", "fuzz_runs")
         fuzz_rss_limit_mb = cp.get("test", "fuzz_rss_limit_mb")
         if fuzz_runs:

@@ -47,6 +47,14 @@ class ArgConfig:
                 "x86_64-linux-ohos": "",  # TODO 未发现release版本
                 "windows": "https://gitcode.com/Cangjie/cangjie_stdx/releases/download/v1.0.4.1/cangjie-stdx-windows-x64-1.0.4.1.zip"
             },
+        "1.1.0":
+            {
+                "aarch64-linux-ohos": "https://gitcode.com/Cangjie/nightly_build/releases/download/1.1.0-alpha.20260210010001/cangjie-stdx-ohos-aarch64-1.1.0-alpha.20260210010001.1.zip",
+                "aarch64": "https://gitcode.com/Cangjie/nightly_build/releases/download/1.1.0-alpha.20260210010001/cangjie-stdx-linux-aarch64-1.1.0-alpha.20260210010001.1.zip",
+                "x86_64-unknown-linux-gnu": "https://gitcode.com/Cangjie/nightly_build/releases/download/1.1.0-alpha.20260210010001/cangjie-stdx-linux-x64-1.1.0-alpha.20260210010001.1.zip",
+                "x86_64-linux-ohos": "https://gitcode.com/Cangjie/nightly_build/releases/download/1.1.0-alpha.20260210010001/cangjie-stdx-ohos-x64-1.1.0-alpha.20260210010001.1.zip",
+                "windows": "https://gitcode.com/Cangjie/nightly_build/releases/download/1.1.0-alpha.20260210010001/cangjie-stdx-windows-x64-1.1.0-alpha.20260210010001.1.zip"
+            },
     }
     BUILD_TYPE = None
     LOG = None
@@ -92,6 +100,7 @@ class ArgConfig:
     UPDATE_CJPM_TOML = False
     GIT_USERNAME = None
     GIT_PASSWORD = None
+    CJC_RUNTIME_SUFFIX = 'llvm'  # cjc 1.0.4(包含)以下为llvm, 以上是 cjnative
 
     def __init__(self):
         master_cjc = shutil.which("cjc")
