@@ -764,8 +764,14 @@ def config_cjc(args):
                     # exit(1)
             if os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
                 cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
+                if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, old_targ)):
+                    shutil.copytree(os.path.join(Path(master_cjc).parent.parent, targ),
+                                    os.path.join(Path(master_cjc).parent.parent, old_targ))
             elif os.path.exists(os.path.join(Path(master_cjc).parent.parent, old_targ)):
                 cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, old_targ, "dynamic", "stdx")
+                if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
+                    shutil.copytree(os.path.join(Path(master_cjc).parent.parent, old_targ),
+                                    os.path.join(Path(master_cjc).parent.parent, targ))
             else:
                 cfgs.LOG.warn("No STDX directory found.")
             __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_DIR)
