@@ -295,7 +295,6 @@ def fuzz_test(args):
 
 
 def cjtest(args):
-    # os.popen('{} -v'.format(master_cjc))
     cfgs = args.CANGJIE_CI_TEST_CFGS
     if args.coverage:
         args.optimize = '-O0 --coverage'
@@ -661,7 +660,7 @@ def get_base_version(output: str) -> str:
 
 def config_cjc(args):
     cfgs = args.CANGJIE_CI_TEST_CFGS
-    master_cjc = shutil.which("cjc")
+    cfgs.WHICH_CJC = shutil.which("cjc")
     # read cjc version
     cfgs.config_init()
     cfg = os.path.join(cfgs.HOME_DIR, cfgs.CONFIG_FILE)
@@ -692,7 +691,7 @@ def config_cjc(args):
                 cfgs.LOG.error('未找到cjpm的源码目录, 请检查')
         else:
             cfgs.BUILD_CJPM_PATH = str(os.path.join(os.getenv("HOME"), '.cjpm', 'git'))
-    if not master_cjc:
+    if not cfgs.WHICH_CJC:
         try:
             set_cangjie_path(args, cfgs)
         except:
@@ -712,24 +711,26 @@ def config_cjc(args):
         cfgs.CANGJIE_HOME = os.path.dirname(os.path.dirname(shutil.which("cjc")))
     except:
         cfgs.LOG.warn("默认配置和用户都未设置仓颉环境, 请检查")
-    out = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
-    cfgs.LOG.info(out)
-    cfgs.BASE_CJC_VERSION = get_base_version(out)
-    cfgs.CANGJIE_TARGET = out.split('Target: ')[1].replace('\n', '').replace('\r', '')
+
+    if cfgs.WHICH_CJC_OUT_STR is None:
+        cfgs.WHICH_CJC_OUT_STR = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
+    cfgs.LOG.info(cfgs.WHICH_CJC_OUT_STR)
+    cfgs.BASE_CJC_VERSION = get_base_version(cfgs.WHICH_CJC_OUT_STR)
+    cfgs.CANGJIE_TARGET = cfgs.WHICH_CJC_OUT_STR.split('Target: ')[1].replace('\n', '').replace('\r', '')
     if compare_versions(cfgs.BASE_CJC_VERSION, '0.49.0') < 0:
         cfgs.set_build_bin("build")
         cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
     else:
         cfgs.set_build_bin("target")
         cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
-    # config stdx for 0.60.*
-    if not cfgs.CANGJIE_STDX_DIR:
-        if compare_versions(cfgs.BASE_CJC_VERSION, '0.61.0') >= 0:
+    if compare_versions(cfgs.BASE_CJC_VERSION, '0.61.0') >= 0:
+        if not cfgs.CANGJIE_STDX_DIR:
             cfgs.LOG.info(f"仓颉版本:{cfgs.BASE_CJC_VERSION}, 需要检查stdx是否配置")
-            if master_cjc:
+            if cfgs.WHICH_CJC:
+                cfgs.IS_SELF_CONFIGURATION = True
                 cfgs.LOG.info("当前环境变量已经设置仓颉, 检查CANGJIE_HOME中是否存在stdx")
             else:
-                master_cjc = shutil.which("cjc")
+                cfgs.WHICH_CJC = shutil.which("cjc")
                 cfgs.LOG.info("未配置仓颉环境, 正在配置指定的路径的stdx")
             if cfgs.CANGJIE_TARGET == "aarch64-linux-ohos":
                 targ = f"linux_ohos_aarch64_{cfgs.CJC_RUNTIME_SUFFIX}"
@@ -745,38 +746,49 @@ def config_cjc(args):
                 targ = f"linux_aarch64_{cfgs.CJC_RUNTIME_SUFFIX}"
             else:
                 targ = "stdx"
-            old_targ = targ.replace("cjnative", 'llvm')
-            if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)) or not os.path.exists(os.path.join(Path(master_cjc).parent.parent, old_targ)):
+            if 'llvm' in targ:
+                targ_2 = targ.replace('llvm', "cjnative")
+            else:
+                targ_2 = targ.replace("cjnative", 'llvm')
+            if not os.path.exists(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ)) or not os.path.exists(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ_2)):
                 if hasattr(args, 'update_stdx') and args.update_stdx:
                     cfgs.LOG.info("stdx文件夹不存在, 正在下载stdx: " + cfgs.get_stdx_url())
-                    if not os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
-                        download_large_with_urllib(cfgs.get_stdx_url(), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'))
-                    if os.path.exists(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')):
-                        unzip_file(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip'), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION))
-                        old_targ = targ.replace("cjnative", 'llvm')
-                        os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, targ)
-                        shutil.copytree(os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, targ), os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, old_targ))
+                    if not cfgs.IS_SELF_CONFIGURATION:
+                        stdx_zip_path = os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')
+                        stdx_zip_path_dirname = os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION)
                     else:
-                        cfgs.LOG.warn(f"stdx.zip不存在, 下载失败: {os.path.join(cfgs.cj_home, cfgs.BASE_CJC_VERSION, 'stdx.zip')}")
+                        stdx_zip_path = os.path.join(cfgs.CANGJIE_HOME, 'stdx.zip')
+                        stdx_zip_path_dirname = cfgs.CANGJIE_HOME
+                    if not os.path.exists(stdx_zip_path):
+                        download_large_with_urllib(cfgs.get_stdx_url(), stdx_zip_path)
+                    if os.path.exists(stdx_zip_path):
+                        unzip_file(stdx_zip_path, stdx_zip_path_dirname)
+                        if os.path.exists(os.path.join(stdx_zip_path_dirname, targ)):
+                            shutil.copytree(os.path.join(stdx_zip_path_dirname, targ), os.path.join(stdx_zip_path_dirname, targ_2))
+                        else:
+                            shutil.copytree(os.path.join(stdx_zip_path_dirname, targ_2), os.path.join(stdx_zip_path_dirname, targ))
+                    else:
+                        cfgs.LOG.warn(f"stdx.zip不存在, 下载失败: {stdx_zip_path}")
                         exit(1)
-                if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                    cfgs.LOG.warn("stdx路径不存在: " + os.path.join(Path(master_cjc).parent.parent, targ))
-                    # exit(1)
-            if os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, targ, "dynamic", "stdx")
-                if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, old_targ)):
-                    shutil.copytree(os.path.join(Path(master_cjc).parent.parent, targ),
-                                    os.path.join(Path(master_cjc).parent.parent, old_targ))
-            elif os.path.exists(os.path.join(Path(master_cjc).parent.parent, old_targ)):
-                cfgs.CANGJIE_STDX_DIR = os.path.join(Path(master_cjc).parent.parent, old_targ, "dynamic", "stdx")
-                if not os.path.exists(os.path.join(Path(master_cjc).parent.parent, targ)):
-                    shutil.copytree(os.path.join(Path(master_cjc).parent.parent, old_targ),
-                                    os.path.join(Path(master_cjc).parent.parent, targ))
+                if not os.path.exists(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ)):
+                    cfgs.LOG.warn("stdx路径不存在: " + os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ))
+            if os.path.exists(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ)):
+                cfgs.CANGJIE_STDX_DIR = os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ, "dynamic", "stdx")
+                if not os.path.exists(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ_2)):
+                    shutil.copytree(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ),
+                                    os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ_2))
+            elif os.path.exists(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ_2)):
+                cfgs.CANGJIE_STDX_DIR = os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ_2, "dynamic", "stdx")
+                if not os.path.exists(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ)):
+                    shutil.copytree(os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ_2),
+                                    os.path.join(Path(cfgs.WHICH_CJC).parent.parent, targ))
             else:
                 cfgs.LOG.warn("No STDX directory found.")
             __set_cangjie_stdx_home(cfgs, cfgs.CANGJIE_STDX_DIR)
         else:
-            cfgs.LOG.info("仓颉版本小于0.60.*")
+            cfgs.LOG.info(f"CANGJIE_STDX_DIR={cfgs.CANGJIE_STDX_DIR}")
+    else:
+        cfgs.LOG.info("仓颉版本小于0.60.*")
 
 
 def init_log(cfgs, name):
@@ -1073,18 +1085,14 @@ def envsetup(args, cfgs):
             cfgs.set_build_bin("target")
             cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
     if h_cjc_version and master_cjc:
-        out = os.popen('{} -v'.format(master_cjc))
-        base_cjc_version = out.readline().split('Cangjie Compiler: ')[1].split(' (')[0]
-        h_cjc_version = base_cjc_version.split(".")
-        if int(h_cjc_version[0]) == 0:
-            if int(h_cjc_version[1]) < 49:
-                cfgs.set_build_bin("build")
-                cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
-            else:
-                cfgs.set_build_bin("target")
-                cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
+        cfgs.WHICH_CJC_OUT_STR = "".join(os.popen('{} -v'.format(shutil.which("cjc"))).readlines())
+        base_cjc_version = get_base_version(cfgs.WHICH_CJC_OUT_STR)
+        if compare_versions(cfgs.BASE_CJC_VERSION, '0.49.0') < 0:
+            cfgs.set_build_bin("build")
+            cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "build")
         else:
-            pass  ## TODO
+            cfgs.set_build_bin("target")
+            cfgs.LIB_DIR = os.path.join(cfgs.HOME_DIR, "target")
         if cjc_version == base_cjc_version:
             cfgs.LOG.info("本地已经配置cjc版本:{} 与项目中配置版本: {} 一致".format(base_cjc_version, cjc_version))
             return True

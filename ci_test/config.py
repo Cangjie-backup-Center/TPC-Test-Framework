@@ -101,6 +101,9 @@ class ArgConfig:
     GIT_USERNAME = None
     GIT_PASSWORD = None
     CJC_RUNTIME_SUFFIX = 'llvm'  # cjc 1.0.4(包含)以下为llvm, 以上是 cjnative
+    WHICH_CJC = None
+    WHICH_CJC_OUT_STR = None
+    IS_SELF_CONFIGURATION = False
 
     def __init__(self):
         master_cjc = shutil.which("cjc")
