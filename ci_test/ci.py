@@ -407,6 +407,9 @@ def download(args):
     if args.username is None and args.password is None:
         args.username = cfgs.GIT_USERNAME = get_config_value(cfgs.BUILD_CI_TEST_CFG, "git-config", "username")
         args.password = cfgs.GIT_PASSWORD = get_config_value(cfgs.BUILD_CI_TEST_CFG, "git-config", "password")
+    bigtest = ["compress4cj", "qrcode4cj", "mp3tag4cj", "xmpp4cj", "mp4parser4cj", "lottie4cj", "videocompress4cj"]
+    if args.bench in bigtest:
+        args.repo = 'test4bigtpc'
     cfgs.LOG.info(f"owner={args.owner}, repo={args.repo}, bench={args.bench}, bench={args.bench}, depth={args.depth}")
 
     target_dir = os.path.join(cfgs.HOME_DIR, 'test')
@@ -814,7 +817,10 @@ def init_log(cfgs, name):
 
 
 def parser_maple_test_config_file(cfgs: ArgConfig):
-    cfg = read_config(complete_path(os.path.join(cfgs.FILE_ROOT, "ci_test.cfg")))
+    if cfgs.BUILD_TYPE == "ci_test":
+        cfg = read_config(complete_path(os.path.join(cfgs.FILE_ROOT, "ci_test.cfg")))
+    else:
+        cfg = read_config(complete_path(os.path.join(cfgs.BASE_DIR, "ci_test.cfg")))
     cfgs.temp_dir = complete_path(
         os.path.join(cfgs.BASE_DIR, get_config_value(cfg, "running", "temp_dir", default="../test_temp/run")))
     cfgs.log_dir = complete_path(
@@ -1586,6 +1592,8 @@ def pareFile(path):
             if exec:
                 if platform.system() == 'Windows' and exec[:6] == './main':
                     exec = '.\\main.exe ' + exec[6:]
+                if (exec[:6] == './main' or exec[:6] == '.\\main') and '--no-progress' not in exec:
+                    exec += ' --no-progress'
                 dicts.get("EXEC").append(exec)
             if dep:
                 for item2 in dep.split(" "):
@@ -1629,7 +1637,7 @@ class ProcessLogger(threading.Thread):
                     time.sleep(0.1)
                     continue
                 if not llt_check_not_start_or_end_with_target(line):
-                    self.logger.info(line.decode('UTF-8', 'ignore').strip())
+                    self.logger.info(line.decode('UTF-8', 'ignore').rstrip())
         except ValueError as e:
             if "info->buf must not be NULL" in str(e):
                 pass
